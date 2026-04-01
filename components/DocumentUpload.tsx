@@ -47,7 +47,8 @@ export default function DocumentUpload({ onUploadSuccess, onProcessingComplete }
   const completedCountRef = useRef(0);
   const failedCountRef = useRef(0);
   const totalFilesRef = useRef(0);
-  const notifiedDocumentsRef = useRef<Set<number>>(new Set()); // Track which docs already showed notifications
+  const notifiedDocumentsRef = useRef<Set<number>>(new Set());
+  const restoredRef = useRef(false); // Gate: don't persist until restore is done
 
   // Cleanup polling intervals on unmount
   useEffect(() => {
@@ -58,6 +59,7 @@ export default function DocumentUpload({ onUploadSuccess, onProcessingComplete }
 
   // Persist full file list to localStorage on every change
   useEffect(() => {
+    if (!restoredRef.current) return; // Don't persist until restore has run
     if (files.length === 0) {
       localStorage.removeItem(STORAGE_KEY);
       return;
@@ -81,7 +83,10 @@ export default function DocumentUpload({ onUploadSuccess, onProcessingComplete }
     const restoreBatch = async () => {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return;
+        if (!raw) {
+          restoredRef.current = true;
+          return;
+        }
 
         const stored: StoredUploadFile[] = JSON.parse(raw);
         const cutoff = Date.now() - STORAGE_MAX_AGE_MS;
@@ -89,6 +94,7 @@ export default function DocumentUpload({ onUploadSuccess, onProcessingComplete }
 
         if (recent.length === 0) {
           localStorage.removeItem(STORAGE_KEY);
+          restoredRef.current = true;
           return;
         }
 
@@ -144,16 +150,19 @@ export default function DocumentUpload({ onUploadSuccess, onProcessingComplete }
 
           // Resume polling for active docs after state is set
           setTimeout(() => {
+            restoredRef.current = true; // Now allow persistence
             for (const { docId, fileIndex } of toResumePoll) {
               pollDocumentStatus(docId, fileIndex);
             }
           }, 100);
         } else {
           localStorage.removeItem(STORAGE_KEY);
+          restoredRef.current = true;
         }
       } catch (error) {
         console.error("Error restoring upload batch:", error);
         localStorage.removeItem(STORAGE_KEY);
+        restoredRef.current = true;
       }
     };
 
