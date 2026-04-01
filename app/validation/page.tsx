@@ -133,6 +133,15 @@ export default function ValidationPage() {
     }
   }, [isAuthenticated, authLoading, loadDocuments, loadCategories]);
 
+  // Auto-refresh: check for new documents every 15 seconds
+  useEffect(() => {
+    if (!isAuthenticated || authLoading) return;
+    const interval = setInterval(() => {
+      loadDocuments();
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated, authLoading, loadDocuments]);
+
   const loadRows = async (docId: number, page: number = 1) => {
     try {
       setLoadingRows(true);
@@ -439,12 +448,15 @@ export default function ValidationPage() {
               <h2 className="text-xl font-semibold text-foreground">
                 Nenhum documento pendente
               </h2>
-              <p className="text-muted-foreground mt-2">
-                Todos os documentos foram validados! Novos uploads aparecerão aqui.
+              <p className="text-muted-foreground mt-2 max-w-md mx-auto">
+                Após enviar documentos na página de Upload, eles aparecerão aqui automaticamente conforme ficarem prontos para validação.
               </p>
             </div>
           ) : (
             <div className="space-y-4 w-full">
+              <p className="text-sm text-muted-foreground text-center">
+                Esta página atualiza automaticamente. Novos documentos aparecerão conforme ficarem prontos.
+              </p>
               {documents.map((doc) => (
                 <div
                   key={doc.id}

@@ -1,69 +1,31 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState } from "react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import DocumentUpload from "@/components/DocumentUpload";
 import SubscriptionGuard from "@/components/stripe/SubscriptionGuard";
 import Sidebar from "@/components/layout/Sidebar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
-import { apiClient } from "@/lib/api";
 import { FileText, Download, FileSpreadsheet } from "lucide-react";
 
 export default function UploadPage() {
   const { user } = useAuth();
   const router = useRouter();
-  const [completedUploads, setCompletedUploads] = useState(0);
-  const [showViewButton, setShowViewButton] = useState(false);
-  const [uploadBatchId, setUploadBatchId] = useState(Date.now());
-
-  // On mount, check if there's a restored batch with completed uploads
-  useEffect(() => {
-    setUploadBatchId(Date.now());
-    try {
-      const raw = localStorage.getItem("controlladoria_upload_batch");
-      if (raw) {
-        const stored = JSON.parse(raw);
-        const completed = stored.filter((f: any) => f.status === "completed").length;
-        if (completed > 0) {
-          setCompletedUploads(completed);
-          setShowViewButton(true);
-        }
-      }
-    } catch { /* ignore */ }
-  }, []);
-
-  const handleUploadSuccess = () => {
-    // Don't redirect automatically - let user see the status
-    setCompletedUploads(prev => prev + 1);
-    setShowViewButton(true);
-  };
-
-  const handleProcessingComplete = (documentId: number) => {
-    // Don't redirect automatically - let user decide when to view documents
-  };
-
-  const handleViewDocuments = () => {
-    // Clear the batch — user is done with this upload session
-    setCompletedUploads(0);
-    setShowViewButton(false);
-    localStorage.removeItem("controlladoria_upload_batch");
-    router.push("/validation");
-  };
+  const [hasUploaded, setHasUploaded] = useState(false);
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-background via-muted/30 to-accent/20 overflow-hidden">
       <Sidebar />
 
       <div className="flex-1 flex flex-col overflow-hidden lg:pt-0">
-        {/* Top Nav Bar with Gradient */}
         <div className="hidden lg:block h-2 bg-gradient-to-r from-[#095a5e] via-[#0d767b] to-[#1a9da3] dark:from-[#d15a12] dark:via-[#f86a15] dark:to-[#fa8c4a]"></div>
 
         <header className="bg-card/80 backdrop-blur-md border-b border-border shadow-sm">
           <div className="px-4 sm:px-6 lg:px-8 pt-16 lg:pt-6 pb-4 sm:py-6">
             <div className="text-center lg:text-left">
-              <h1 className="text-2xl sm:text-3xl font-bold text-foreground">⬆️ Upload de Documentos</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Upload de Documentos</h1>
               <p className="text-sm sm:text-lg text-muted-foreground mt-1">
                 Envie notas fiscais, recibos ou documentos financeiros
               </p>
@@ -77,20 +39,18 @@ export default function UploadPage() {
               <Card className="shadow-xl border-2">
                 <CardContent className="pt-8">
                   <DocumentUpload
-                    onUploadSuccess={handleUploadSuccess}
-                    onProcessingComplete={handleProcessingComplete}
+                    onUploadSuccess={() => setHasUploaded(true)}
                   />
 
-                  {/* View Documents Button - appears after uploads complete */}
-                  {showViewButton && (
+                  {hasUploaded && (
                     <div className="mt-8 flex justify-center">
                       <Button
                         size="lg"
-                        onClick={handleViewDocuments}
+                        onClick={() => router.push("/validation")}
                         className="gap-2 text-lg px-8 py-6 bg-gradient-to-r from-[#095a5e] via-[#0d767b] to-[#1a9da3] dark:from-[#d15a12] dark:via-[#f86a15] dark:to-[#fa8c4a] hover:opacity-90 text-white font-bold shadow-lg"
                       >
                         <FileText className="w-6 h-6" />
-                        Validar Documentos ({completedUploads} pronto{completedUploads !== 1 ? 's' : ''})
+                        Ir para Validação
                       </Button>
                     </div>
                   )}
