@@ -23,6 +23,22 @@ interface UploadedFile {
   queueMessage?: string;
 }
 
+// Serializable version for localStorage persistence
+interface StoredUploadFile {
+  fileName: string;
+  fileSize: number;
+  fileType: string;
+  id?: number;
+  status: UploadedFile["status"];
+  progress: number;
+  error?: string;
+  queueMessage?: string;
+  storedAt: number;
+}
+
+const STORAGE_KEY = "controlladoria_upload_batch";
+const STORAGE_MAX_AGE_MS = 15 * 60 * 1000; // 15 minutes
+
 export default function DocumentUpload({ onUploadSuccess, onProcessingComplete }: DocumentUploadProps) {
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
@@ -40,79 +56,108 @@ export default function DocumentUpload({ onUploadSuccess, onProcessingComplete }
     };
   }, []);
 
-  // Persist active uploads to localStorage
+  // Persist full file list to localStorage on every change
   useEffect(() => {
-    const activeUploads = files
-      .filter(f => (f.status === "processing" || f.status === "queued") && f.id)
-      .map(f => ({ id: f.id!, fileName: f.file.name, startedAt: Date.now() }));
-
-    if (activeUploads.length > 0) {
-      localStorage.setItem('activeUploads', JSON.stringify(activeUploads));
-    } else {
-      localStorage.removeItem('activeUploads');
+    if (files.length === 0) {
+      localStorage.removeItem(STORAGE_KEY);
+      return;
     }
+    const stored: StoredUploadFile[] = files.map(f => ({
+      fileName: f.file.name,
+      fileSize: f.file.size,
+      fileType: f.file.type || f.file.name.split(".").pop() || "",
+      id: f.id,
+      status: f.status === "uploading" ? "queued" : f.status, // uploading won't survive refresh
+      progress: f.progress,
+      error: f.error,
+      queueMessage: f.queueMessage,
+      storedAt: Date.now(),
+    }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
   }, [files]);
 
-  // Resume polling for active uploads on mount
+  // Restore full file list from localStorage on mount
   useEffect(() => {
-    const resumeActiveUploads = async () => {
+    const restoreBatch = async () => {
       try {
-        const stored = localStorage.getItem('activeUploads');
-        if (!stored) return;
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return;
 
-        const activeUploads: Array<{ id: number; fileName: string; startedAt: number }> = JSON.parse(stored);
+        const stored: StoredUploadFile[] = JSON.parse(raw);
+        const cutoff = Date.now() - STORAGE_MAX_AGE_MS;
+        const recent = stored.filter(s => s.storedAt > cutoff);
 
-        // Filter out stale uploads (older than 10 minutes)
-        const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
-        const recentUploads = activeUploads.filter(u => u.startedAt > tenMinutesAgo);
-
-        if (recentUploads.length === 0) {
-          localStorage.removeItem('activeUploads');
+        if (recent.length === 0) {
+          localStorage.removeItem(STORAGE_KEY);
           return;
         }
 
-        // Query server for current status of these documents
-        const apiClient = (await import('@/lib/api')).apiClient;
+        // Rebuild file list — for completed/failed, restore as-is.
+        // For queued/processing, check current server status.
+        const restoredFiles: UploadedFile[] = [];
+        const toResumePoll: Array<{ docId: number; fileIndex: number }> = [];
 
-        for (const upload of recentUploads) {
-          try {
-            const doc = await apiClient.getDocument(upload.id);
+        for (const s of recent) {
+          const fakeFile = new File([], s.fileName, { type: s.fileType });
+          // Patch size for display (File constructor doesn't accept size, so we store it separately)
+          Object.defineProperty(fakeFile, "size", { value: s.fileSize, writable: false });
 
-            if (doc.status === "processing") {
-              // Add to files list and resume polling
-              const fileObj = new File([], upload.fileName);
-              const uploadedFile: UploadedFile = {
-                file: fileObj,
-                id: upload.id,
-                status: "processing",
-                progress: 50,
-              };
+          const restored: UploadedFile = {
+            file: fakeFile,
+            id: s.id,
+            status: s.status,
+            progress: s.progress,
+            error: s.error,
+            queueMessage: s.queueMessage,
+          };
 
-              setFiles(prev => [...prev, uploadedFile]);
-
-              // Resume polling
-              const fileIndex = files.length;
-              pollDocumentStatus(upload.id, fileIndex);
-            } else {
-              // Already completed or failed, remove from localStorage
-              const remaining = recentUploads.filter(u => u.id !== upload.id);
-              if (remaining.length > 0) {
-                localStorage.setItem('activeUploads', JSON.stringify(remaining));
+          if (s.id && (s.status === "queued" || s.status === "processing")) {
+            // Check server for real status
+            try {
+              const doc = await apiClient.getDocument(s.id);
+              if (doc.status === "completed" || doc.status === "pending_validation") {
+                restored.status = "completed";
+                restored.progress = 100;
+                completedCountRef.current += 1;
+                onUploadSuccess?.(s.id);
+              } else if (doc.status === "failed") {
+                restored.status = "failed";
+                restored.error = doc.error_message || "Erro no processamento";
               } else {
-                localStorage.removeItem('activeUploads');
+                // Still active — resume polling
+                toResumePoll.push({ docId: s.id, fileIndex: restoredFiles.length });
               }
+            } catch {
+              // Can't reach server — keep stored status, will re-check on next poll
             }
-          } catch (error) {
-            console.error(`Error checking status of document ${upload.id}:`, error);
           }
+
+          // Skip "pending" files that were never uploaded (no id) — they'd need re-selecting
+          if (s.status === "pending" && !s.id) continue;
+
+          restoredFiles.push(restored);
+        }
+
+        if (restoredFiles.length > 0) {
+          totalFilesRef.current = restoredFiles.length;
+          setFiles(restoredFiles);
+
+          // Resume polling for active docs after state is set
+          setTimeout(() => {
+            for (const { docId, fileIndex } of toResumePoll) {
+              pollDocumentStatus(docId, fileIndex);
+            }
+          }, 100);
+        } else {
+          localStorage.removeItem(STORAGE_KEY);
         }
       } catch (error) {
-        console.error('Error resuming active uploads:', error);
-        localStorage.removeItem('activeUploads');
+        console.error("Error restoring upload batch:", error);
+        localStorage.removeItem(STORAGE_KEY);
       }
     };
 
-    resumeActiveUploads();
+    restoreBatch();
   }, []); // Run once on mount
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -205,7 +250,7 @@ export default function DocumentUpload({ onUploadSuccess, onProcessingComplete }
 
   const pollDocumentStatus = async (documentId: number, fileIndex: number) => {
     let pollCount = 0;
-    const maxPolls = 60; // 3 minutes max (60 * 3 seconds)
+    const maxPolls = 120; // 6 minutes max (120 * 3 seconds) — Lambda can take up to 10min for large files
 
     const interval = setInterval(async () => {
       pollCount++;
@@ -311,15 +356,17 @@ export default function DocumentUpload({ onUploadSuccess, onProcessingComplete }
             );
           }
         } else if (doc.status === "pending") {
-          // Still in queue - update queue display
+          // In SQS queue waiting for Lambda to pick it up
+          // Gently pulse progress between 5-15% to show it's alive
+          const queueProgress = 5 + (pollCount % 4) * 3;
           setFiles(prev => prev.map((f, i) =>
             i === fileIndex
-              ? { ...f, status: "queued", progress: 10 }
+              ? { ...f, status: "queued", progress: queueProgress, queueMessage: "Na fila — aguardando processamento..." }
               : f
           ));
         } else if (doc.status === "processing") {
-          // Update progress indicator (may have just transitioned from queued)
-          const progress = 30 + (pollCount * 0.5); // Simulated progress
+          // Lambda picked it up — progress from 20% to 90%
+          const progress = 20 + Math.min(70, pollCount * 2);
           setFiles(prev => prev.map((f, i) =>
             i === fileIndex
               ? { ...f, status: "processing", progress: Math.min(90, progress), queueMessage: undefined }
@@ -534,17 +581,17 @@ export default function DocumentUpload({ onUploadSuccess, onProcessingComplete }
   const getStatusText = (status: UploadedFile["status"], queueMessage?: string) => {
     switch (status) {
       case "uploading":
-        return "Enviando...";
+        return "Enviando ao servidor...";
       case "queued":
-        return queueMessage || "Na fila de processamento...";
+        return queueMessage || "Na fila — aguardando processamento...";
       case "processing":
-        return "Processando com IA...";
+        return "Extraindo dados com IA...";
       case "completed":
-        return "✓ Enviado - Aguardando validação";
+        return "Pronto para validação";
       case "failed":
-        return "Falha";
+        return "Falha no processamento";
       default:
-        return "Pronto";
+        return "Pronto para enviar";
     }
   };
 

@@ -18,10 +18,20 @@ export default function UploadPage() {
   const [showViewButton, setShowViewButton] = useState(false);
   const [uploadBatchId, setUploadBatchId] = useState(Date.now());
 
-  // Reset counter when component mounts or user navigates back
+  // On mount, check if there's a restored batch with completed uploads
   useEffect(() => {
-    setCompletedUploads(0);
     setUploadBatchId(Date.now());
+    try {
+      const raw = localStorage.getItem("controlladoria_upload_batch");
+      if (raw) {
+        const stored = JSON.parse(raw);
+        const completed = stored.filter((f: any) => f.status === "completed").length;
+        if (completed > 0) {
+          setCompletedUploads(completed);
+          setShowViewButton(true);
+        }
+      }
+    } catch { /* ignore */ }
   }, []);
 
   const handleUploadSuccess = () => {
@@ -35,10 +45,11 @@ export default function UploadPage() {
   };
 
   const handleViewDocuments = () => {
-    // Reset counter when navigating away
+    // Clear the batch — user is done with this upload session
     setCompletedUploads(0);
     setShowViewButton(false);
-    router.push("/documents");
+    localStorage.removeItem("controlladoria_upload_batch");
+    router.push("/validation");
   };
 
   return (
@@ -79,7 +90,7 @@ export default function UploadPage() {
                         className="gap-2 text-lg px-8 py-6 bg-gradient-to-r from-[#095a5e] via-[#0d767b] to-[#1a9da3] dark:from-[#d15a12] dark:via-[#f86a15] dark:to-[#fa8c4a] hover:opacity-90 text-white font-bold shadow-lg"
                       >
                         <FileText className="w-6 h-6" />
-                        Ver Documentos ({completedUploads} processado{completedUploads !== 1 ? 's' : ''})
+                        Validar Documentos ({completedUploads} pronto{completedUploads !== 1 ? 's' : ''})
                       </Button>
                     </div>
                   )}
