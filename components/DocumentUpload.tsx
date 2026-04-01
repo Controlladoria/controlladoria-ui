@@ -253,7 +253,29 @@ export default function DocumentUpload({ onUploadSuccess, onProcessingComplete }
     fileInputRef.current?.click();
   };
 
+  const cancelAll = () => {
+    // Stop all polling
+    pollingIntervalsRef.current.forEach(interval => clearInterval(interval));
+    pollingIntervalsRef.current.clear();
+    // Reset all state
+    setFiles([]);
+    completedCountRef.current = 0;
+    failedCountRef.current = 0;
+    totalFilesRef.current = 0;
+    notifiedDocumentsRef.current.clear();
+    localStorage.removeItem(STORAGE_KEY);
+  };
+
   const removeFile = (index: number) => {
+    const fileItem = files[index];
+    // Stop polling if active
+    if (fileItem?.id) {
+      const interval = pollingIntervalsRef.current.get(fileItem.id);
+      if (interval) {
+        clearInterval(interval);
+        pollingIntervalsRef.current.delete(fileItem.id);
+      }
+    }
     setFiles(prev => prev.filter((_, i) => i !== index));
   };
 
@@ -654,15 +676,26 @@ export default function DocumentUpload({ onUploadSuccess, onProcessingComplete }
             <h3 className="text-lg font-semibold text-foreground">
               Arquivos ({files.length})
             </h3>
-            <Button
-              onClick={handleUploadAll}
-              disabled={hasActiveUploads || files.every(f => f.status !== "pending")}
-              size="lg"
-              className="gap-2 text-base px-6 py-6 bg-gradient-to-r from-[#0d767b] to-[#f86a15] hover:from-[#f86a15] hover:to-[#0d767b] text-white"
-            >
-              <FileUp className="w-5 h-5" />
-              Enviar Todos
-            </Button>
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={cancelAll}
+                variant="outline"
+                size="lg"
+                className="gap-2 text-base px-6 py-6 text-red-600 border-red-300 hover:bg-red-50 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-950"
+              >
+                <X className="w-5 h-5" />
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleUploadAll}
+                disabled={hasActiveUploads || files.every(f => f.status !== "pending")}
+                size="lg"
+                className="gap-2 text-base px-6 py-6 bg-gradient-to-r from-[#0d767b] to-[#f86a15] hover:from-[#f86a15] hover:to-[#0d767b] text-white"
+              >
+                <FileUp className="w-5 h-5" />
+                Enviar Todos
+              </Button>
+            </div>
           </div>
 
           <div className="space-y-3 max-h-[500px] overflow-y-auto">
@@ -708,7 +741,7 @@ export default function DocumentUpload({ onUploadSuccess, onProcessingComplete }
                     {fileItem.file.type.split("/")[1]?.toUpperCase()}
                   </Badge>
 
-                  {fileItem.status === "pending" && (
+                  {fileItem.status !== "uploading" && (
                     <Button
                       variant="ghost"
                       size="lg"
@@ -716,7 +749,7 @@ export default function DocumentUpload({ onUploadSuccess, onProcessingComplete }
                         e.stopPropagation();
                         removeFile(index);
                       }}
-                      className="h-10 w-10 p-0"
+                      className="h-10 w-10 p-0 text-muted-foreground hover:text-red-600 dark:hover:text-red-400"
                     >
                       <X className="w-5 h-5" />
                     </Button>
