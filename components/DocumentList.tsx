@@ -129,6 +129,16 @@ export default function DocumentList({ onDocumentChange }: DocumentListProps) {
     }
   };
 
+  const handleRetry = async (id: number) => {
+    try {
+      await apiClient.retryDocument(id);
+      toast.success("Documento enviado para reprocessamento");
+      fetchDocuments();
+    } catch (error: any) {
+      toast.error(error.response?.data?.detail || "Erro ao reprocessar documento");
+    }
+  };
+
   const handleDeleteClick = (id: number) => {
     setDocumentToDelete(id);
     setDeleteConfirmOpen(true);
@@ -527,6 +537,13 @@ export default function DocumentList({ onDocumentChange }: DocumentListProps) {
                           </Button>
                         </>
                       )}
+                      {doc.status === "failed" && (
+                        <Button size="sm" variant="outline" onClick={() => handleRetry(doc.id)}
+                          className="border-blue-500 text-blue-600 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-950"
+                        >
+                          🔄
+                        </Button>
+                      )}
                       <Button size="sm" variant="destructive" onClick={() => handleDeleteClick(doc.id)}>
                         🗑️
                       </Button>
@@ -682,6 +699,17 @@ export default function DocumentList({ onDocumentChange }: DocumentListProps) {
                                 ✏️ Editar
                               </Button>
                             </>
+                          )}
+                          {doc.status === "failed" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleRetry(doc.id)}
+                              title="Reprocessar documento"
+                              className="border-blue-500 text-blue-600 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-950"
+                            >
+                              🔄 Reprocessar
+                            </Button>
                           )}
                           <Button
                             size="sm"

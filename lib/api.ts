@@ -185,6 +185,12 @@ export const apiClient = {
     return response.data;
   },
 
+  // Retry failed document
+  async retryDocument(id: number): Promise<{ document_id: number; status: string; message: string }> {
+    const response = await api.post(`/documents/${id}/retry`);
+    return response.data;
+  },
+
   // Delete document
   async deleteDocument(id: number): Promise<{ message: string; id: number }> {
     const response = await api.delete(`/documents/${id}`);
