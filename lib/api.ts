@@ -1,5 +1,5 @@
 /**
- * API Client for DreSystem FastAPI Backend
+ * API Client for ControlladorIA FastAPI Backend
  */
 
 import axios from 'axios';
