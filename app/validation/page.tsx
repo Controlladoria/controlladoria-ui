@@ -444,7 +444,7 @@ export default function ValidationPage() {
               </p>
             </div>
           ) : (
-            <div className="space-y-4 max-w-5xl mx-auto">
+            <div className="space-y-4 w-full">
               {documents.map((doc) => (
                 <div
                   key={doc.id}

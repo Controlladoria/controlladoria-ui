@@ -220,6 +220,7 @@ export default function Dashboard() {
             setShowWizard(false);
             setNeedsWizard(false);
           }}
+          onSkip={() => setShowWizard(false)}
         />
       )}
     </div>

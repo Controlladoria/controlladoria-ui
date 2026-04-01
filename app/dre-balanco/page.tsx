@@ -97,13 +97,13 @@ export default function DreBalancoPage() {
         </div>
       </div>
 
-      {/* Initial Balance Wizard - no onSkip = no way to dismiss without completing */}
       {showWizard && (
         <InitialBalanceWizard
           onComplete={() => {
             setShowWizard(false);
             setNeedsWizard(false);
           }}
+          onSkip={() => setShowWizard(false)}
         />
       )}
     </div>
