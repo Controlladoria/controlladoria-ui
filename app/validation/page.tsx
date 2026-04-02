@@ -97,16 +97,43 @@ export default function ValidationPage() {
   const [editingAliasRowId, setEditingAliasRowId] = useState<number | null>(null);
   const [aliasInput, setAliasInput] = useState("");
 
-  const loadDocuments = useCallback(async () => {
+  const loadDocuments = useCallback(async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const response = await api.get("/documents/pending-validation/list");
-      setDocuments(response.data.documents || []);
+      const newDocs = response.data.documents || [];
+
+      if (silent) {
+        // Background refresh: merge new docs without flashing the whole list
+        setDocuments(prev => {
+          const existingIds = new Set(prev.map((d: any) => d.id));
+          const newIds = new Set(newDocs.map((d: any) => d.id));
+
+          // Add docs that are new (not in current list)
+          const added = newDocs.filter((d: any) => !existingIds.has(d.id));
+          // Remove docs that are gone (validated/deleted since last check)
+          const kept = prev.filter((d: any) => newIds.has(d.id));
+
+          if (added.length === 0 && kept.length === prev.length) {
+            return prev; // No changes — don't trigger re-render
+          }
+
+          if (added.length > 0) {
+            toast.info(`${added.length} novo${added.length > 1 ? 's' : ''} documento${added.length > 1 ? 's' : ''} pronto${added.length > 1 ? 's' : ''} para validação`, { duration: 3000 });
+          }
+
+          return [...kept, ...added];
+        });
+      } else {
+        setDocuments(newDocs);
+      }
     } catch (error) {
-      console.error("Error loading validation documents:", error);
-      toast.error("Erro ao carregar documentos pendentes");
+      if (!silent) {
+        console.error("Error loading validation documents:", error);
+        toast.error("Erro ao carregar documentos pendentes");
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
@@ -133,12 +160,12 @@ export default function ValidationPage() {
     }
   }, [isAuthenticated, authLoading, loadDocuments, loadCategories]);
 
-  // Auto-refresh: check for new documents every 15 seconds, but only when not editing
+  // Auto-refresh: silently check for new documents every 15 seconds
   useEffect(() => {
     if (!isAuthenticated || authLoading) return;
     const interval = setInterval(() => {
       if (!expandedDocId) {
-        loadDocuments();
+        loadDocuments(true); // silent — no spinner, no flash, just merge new docs in
       }
     }, 15000);
     return () => clearInterval(interval);
