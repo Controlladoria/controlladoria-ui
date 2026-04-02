@@ -133,14 +133,16 @@ export default function ValidationPage() {
     }
   }, [isAuthenticated, authLoading, loadDocuments, loadCategories]);
 
-  // Auto-refresh: check for new documents every 15 seconds
+  // Auto-refresh: check for new documents every 15 seconds, but only when not editing
   useEffect(() => {
     if (!isAuthenticated || authLoading) return;
     const interval = setInterval(() => {
-      loadDocuments();
+      if (!expandedDocId) {
+        loadDocuments();
+      }
     }, 15000);
     return () => clearInterval(interval);
-  }, [isAuthenticated, authLoading, loadDocuments]);
+  }, [isAuthenticated, authLoading, loadDocuments, expandedDocId]);
 
   const loadRows = async (docId: number, page: number = 1) => {
     try {
