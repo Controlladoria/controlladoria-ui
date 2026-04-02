@@ -133,7 +133,7 @@ export default function DocumentList({ onDocumentChange }: DocumentListProps) {
     try {
       await apiClient.retryDocument(id);
       toast.success("Documento enviado para reprocessamento");
-      fetchDocuments();
+      loadDocuments();
     } catch (error: any) {
       toast.error(error.response?.data?.detail || "Erro ao reprocessar documento");
     }
