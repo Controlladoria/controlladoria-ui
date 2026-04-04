@@ -177,6 +177,7 @@ export default function ValidationPage() {
   const loadRows = async (docId: number, page: number = 1) => {
     try {
       setLoadingRows(true);
+      setRows([]); // Clear immediately — don't render stale rows while loading
       const response = await api.get(
         `/documents/${docId}/validation-rows?page=${page}&page_size=${PAGE_SIZE}`
       );
@@ -209,14 +210,10 @@ export default function ValidationPage() {
       setEditingAliasRowId(null);
       setCurrentPage(1);
       await loadRows(docId, 1);
-      // Fetch known item matches
-      try {
-        const matchRes = await api.get(`/documents/${docId}/validation-rows/known-matches`);
-        setKnownMatches(matchRes.data.matches || {});
-      } catch (error) {
-        // Non-critical: known items just won't show badges
-        console.error("Error loading known matches:", error);
-      }
+      // Fetch known item matches in background (non-blocking — rows show first)
+      api.get(`/documents/${docId}/validation-rows/known-matches`)
+        .then(res => setKnownMatches(res.data.matches || {}))
+        .catch(() => {}); // Non-critical
     }
   };
 
@@ -564,6 +561,19 @@ export default function ValidationPage() {
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-border">
+                                {loadingRows ? (
+                                  <tr>
+                                    <td colSpan={7} className="text-center py-8">
+                                      <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
+                                    </td>
+                                  </tr>
+                                ) : rows.length === 0 ? (
+                                  <tr>
+                                    <td colSpan={7} className="text-center py-8 text-muted-foreground">
+                                      Nenhuma linha encontrada
+                                    </td>
+                                  </tr>
+                                ) : null}
                                 {rows.map((row) => {
                                   const isTotalRow = row.row_index === 0 && rows.length > 1;
                                   return (
@@ -800,6 +810,15 @@ export default function ValidationPage() {
                                             {row.is_validated ? (
                                               <>
                                                 <CheckCircle2 className="w-5 h-5 text-green-500" />
+                                                <Button
+                                                  size="sm"
+                                                  variant="ghost"
+                                                  onClick={() => startEditing(row)}
+                                                  className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                                                  title="Editar"
+                                                >
+                                                  <Pencil className="w-3.5 h-3.5" />
+                                                </Button>
                                                 <Button
                                                   size="sm"
                                                   variant="ghost"
