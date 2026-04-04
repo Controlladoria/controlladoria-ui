@@ -94,6 +94,11 @@ export default function ValidationPage() {
   const [validatedCount, setValidatedCount] = useState(0);
   const PAGE_SIZE = 50;
 
+  // Row filters
+  const [rowSearch, setRowSearch] = useState("");
+  const [rowCategoryFilter, setRowCategoryFilter] = useState("");
+  const [rowTypeFilter, setRowTypeFilter] = useState("");
+
   // Known Items state
   const [knownMatches, setKnownMatches] = useState<Record<string, KnownItemMatch>>({});
   const [editingAliasRowId, setEditingAliasRowId] = useState<number | null>(null);
@@ -174,12 +179,19 @@ export default function ValidationPage() {
     return () => clearInterval(interval);
   }, [isAuthenticated, authLoading, loadDocuments, expandedDocId]);
 
-  const loadRows = async (docId: number, page: number = 1) => {
+  const loadRows = async (docId: number, page: number = 1, filters?: { search?: string; category?: string; type?: string }) => {
     try {
       setLoadingRows(true);
       setRows([]); // Clear immediately — don't render stale rows while loading
+      const params = new URLSearchParams({ page: String(page), page_size: String(PAGE_SIZE) });
+      const s = filters?.search ?? rowSearch;
+      const c = filters?.category ?? rowCategoryFilter;
+      const t = filters?.type ?? rowTypeFilter;
+      if (s) params.set("search", s);
+      if (c) params.set("category", c);
+      if (t) params.set("transaction_type", t);
       const response = await api.get(
-        `/documents/${docId}/validation-rows?page=${page}&page_size=${PAGE_SIZE}`
+        `/documents/${docId}/validation-rows?${params.toString()}`
       );
       setRows(response.data.rows || []);
       setCurrentPage(response.data.page || 1);
@@ -200,6 +212,7 @@ export default function ValidationPage() {
       setRows([]);
       setEditingRowId(null);
       setAddingRow(false);
+      setRowSearch(""); setRowCategoryFilter(""); setRowTypeFilter("");
       setKnownMatches({});
       setEditingAliasRowId(null);
       setCurrentPage(1);
@@ -548,6 +561,73 @@ export default function ValidationPage() {
                         </div>
                       ) : (
                         <>
+                          {/* Row Filters */}
+                          {totalRows > 20 && (
+                            <div className="flex flex-wrap items-center gap-2 px-4 py-2 bg-muted/30 border-b border-border">
+                              <input
+                                type="text"
+                                placeholder="Buscar descrição..."
+                                value={rowSearch}
+                                onChange={(e) => {
+                                  setRowSearch(e.target.value);
+                                  // Debounce: apply filter after user stops typing
+                                  clearTimeout((window as any).__rowSearchTimer);
+                                  (window as any).__rowSearchTimer = setTimeout(() => {
+                                    setCurrentPage(1);
+                                    loadRows(doc.id, 1, { search: e.target.value, category: rowCategoryFilter, type: rowTypeFilter });
+                                  }, 400);
+                                }}
+                                className="px-2 py-1 text-sm bg-background text-foreground border border-border rounded w-48 focus:ring-1 focus:ring-[#0d767b]"
+                              />
+                              <select
+                                value={rowCategoryFilter}
+                                onChange={(e) => {
+                                  setRowCategoryFilter(e.target.value);
+                                  setCurrentPage(1);
+                                  loadRows(doc.id, 1, { search: rowSearch, category: e.target.value, type: rowTypeFilter });
+                                }}
+                                className="px-2 py-1 text-sm bg-background text-foreground border border-border rounded focus:ring-1 focus:ring-[#0d767b]"
+                              >
+                                <option value="">Todas categorias</option>
+                                {categories.map(cat => (
+                                  <option key={cat.key} value={cat.key}>{cat.display_name}</option>
+                                ))}
+                              </select>
+                              <select
+                                value={rowTypeFilter}
+                                onChange={(e) => {
+                                  setRowTypeFilter(e.target.value);
+                                  setCurrentPage(1);
+                                  loadRows(doc.id, 1, { search: rowSearch, category: rowCategoryFilter, type: e.target.value });
+                                }}
+                                className="px-2 py-1 text-sm bg-background text-foreground border border-border rounded focus:ring-1 focus:ring-[#0d767b]"
+                              >
+                                <option value="">Todos tipos</option>
+                                <option value="receita">Receita</option>
+                                <option value="despesa">Despesa</option>
+                                <option value="custo">Custo</option>
+                                <option value="investimento">Investimento</option>
+                              </select>
+                              {(rowSearch || rowCategoryFilter || rowTypeFilter) && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setRowSearch(""); setRowCategoryFilter(""); setRowTypeFilter("");
+                                    setCurrentPage(1);
+                                    loadRows(doc.id, 1, { search: "", category: "", type: "" });
+                                  }}
+                                  className="text-xs text-muted-foreground"
+                                >
+                                  Limpar filtros
+                                </Button>
+                              )}
+                              <span className="text-xs text-muted-foreground ml-auto">
+                                {totalRows} resultado{totalRows !== 1 ? "s" : ""}
+                              </span>
+                            </div>
+                          )}
+
                           {/* Rows Table */}
                           <div className="overflow-x-auto">
                             <table className="w-full text-sm">
