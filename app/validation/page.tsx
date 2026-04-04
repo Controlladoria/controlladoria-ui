@@ -477,6 +477,7 @@ export default function ValidationPage() {
                   </h2>
                   <p className="text-muted-foreground mt-2 max-w-md mx-auto">
                     Aguarde, os documentos aparecerão aqui automaticamente conforme ficarem prontos.
+                    Planilhas grandes (5.000+ linhas) podem levar até 20 minutos.
                   </p>
                 </>
               ) : (
@@ -497,6 +498,7 @@ export default function ValidationPage() {
                 <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded-lg py-2 px-4">
                   <Loader2 className="w-4 h-4 animate-spin" />
                   {processingCount} documento{processingCount !== 1 ? 's' : ''} em processamento — aparecerão aqui automaticamente.
+                  Planilhas grandes (5.000+ linhas) podem levar até 20 minutos.
                 </div>
               )}
               {documents.filter(doc => !searchFilter || doc.file_name.toLowerCase().includes(searchFilter.toLowerCase())).map((doc) => (

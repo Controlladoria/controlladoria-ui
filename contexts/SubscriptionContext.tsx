@@ -97,7 +97,12 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     try {
       const status = await stripeApiClient.getSubscriptionStatus();
       setSubscription(status);
-    } catch (error) {
+    } catch (error: any) {
+      // If it's a 401, the auth interceptor handles redirect — don't set sub to null
+      // which would cause ProtectedRoute to redirect to /account/subscription
+      if (error?.response?.status === 401) {
+        return; // Auth interceptor is handling it
+      }
       console.error('Failed to load subscription:', error);
       setSubscription(null);
     } finally {
