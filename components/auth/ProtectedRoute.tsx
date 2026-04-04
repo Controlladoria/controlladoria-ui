@@ -37,7 +37,8 @@ export default function ProtectedRoute({
 
     // First check: user must be authenticated
     if (!isAuthenticated) {
-      router.push(redirectTo);
+      // Hard redirect — client-side router.push can fail if auth state is corrupted
+      window.location.href = redirectTo;
       return;
     }
 
@@ -57,12 +58,13 @@ export default function ProtectedRoute({
   }
 
   if (!isAuthenticated) {
-    return null;
+    // Show loading while redirect happens — never show empty page
+    return <FullPageLoading message="Redirecionando..." />;
   }
 
   // Block access if no subscription (unless on public page)
   if (!isPublicPage && !hasActiveSubscription && !isTrialing) {
-    return null;
+    return <FullPageLoading message="Redirecionando..." />;
   }
 
   return <>{children}</>;

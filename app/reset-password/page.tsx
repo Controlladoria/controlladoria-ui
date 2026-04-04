@@ -91,20 +91,20 @@ function ResetPasswordForm() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0d767b]/5 to-[#0d767b]/15 px-4 py-8">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted px-4 py-8">
       <div className="w-full max-w-xl">
-        <div className="bg-white rounded-2xl shadow-xl p-10">
+        <div className="bg-card rounded-2xl shadow-xl p-10 border border-border">
           {/* Header */}
           <div className="text-center mb-10">
-            <h1 className="text-4xl font-bold text-gray-900 mb-3">Nova Senha</h1>
-            <p className="text-lg text-gray-600">Digite sua nova senha</p>
+            <h1 className="text-4xl font-bold text-foreground mb-3">Nova Senha</h1>
+            <p className="text-lg text-muted-foreground">Digite sua nova senha</p>
           </div>
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-7">
             {/* New Password */}
             <div>
-              <label htmlFor="newPassword" className="block text-base font-medium text-gray-700 mb-2">
+              <label htmlFor="newPassword" className="block text-base font-medium text-foreground mb-2">
                 Nova Senha
               </label>
               <div className="relative">
@@ -116,14 +116,14 @@ function ResetPasswordForm() {
                   onChange={handleChange}
                   required
                   minLength={8}
-                  className="w-full px-5 py-3.5 pr-12 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0d767b] focus:border-transparent transition-all"
+                  className="w-full px-5 py-3.5 pr-12 text-base bg-background text-foreground border border-border rounded-lg focus:ring-2 focus:ring-[#0d767b] focus:border-transparent transition-all"
                   placeholder="Exemplo: MinhaSenh@123"
                   disabled={isLoading}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                   tabIndex={-1}
                 >
                   {showPassword ? (
@@ -138,14 +138,14 @@ function ResetPasswordForm() {
                   )}
                 </button>
               </div>
-              <p className="text-sm text-gray-500 mt-2">
+              <p className="text-sm text-muted-foreground mt-2">
                 A senha deve ter no mínimo 8 caracteres e conter: 1 letra maiúscula, 1 letra minúscula e 1 número
               </p>
             </div>
 
             {/* Confirm Password */}
             <div>
-              <label htmlFor="confirmPassword" className="block text-base font-medium text-gray-700 mb-2">
+              <label htmlFor="confirmPassword" className="block text-base font-medium text-foreground mb-2">
                 Confirmar Nova Senha
               </label>
               <div className="relative">
@@ -156,14 +156,14 @@ function ResetPasswordForm() {
                   value={formData.confirmPassword}
                   onChange={handleChange}
                   required
-                  className="w-full px-5 py-3.5 pr-12 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0d767b] focus:border-transparent transition-all"
+                  className="w-full px-5 py-3.5 pr-12 text-base bg-background text-foreground border border-border rounded-lg focus:ring-2 focus:ring-[#0d767b] focus:border-transparent transition-all"
                   placeholder="Digite a senha novamente"
                   disabled={isLoading}
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                   tabIndex={-1}
                 >
                   {showConfirmPassword ? (
@@ -192,7 +192,7 @@ function ResetPasswordForm() {
 
           {/* Back to Login */}
           <div className="mt-8 text-center">
-            <Link href="/login" className="text-base text-gray-600 hover:text-gray-900 transition-colors">
+            <Link href="/login" className="text-base text-muted-foreground hover:text-foreground transition-colors">
               ← Voltar para o login
             </Link>
           </div>
@@ -205,10 +205,10 @@ function ResetPasswordForm() {
 export default function ResetPasswordPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0d767b]/5 to-[#0d767b]/15">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted">
         <div className="text-center">
           <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-[#0d767b] border-r-transparent"></div>
-          <p className="mt-4 text-gray-600">Carregando...</p>
+          <p className="mt-4 text-muted-foreground">Carregando...</p>
         </div>
       </div>
     }>

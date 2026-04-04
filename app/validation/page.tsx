@@ -71,8 +71,10 @@ interface KnownItemMatch {
 export default function ValidationPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [documents, setDocuments] = useState<ValidationDocument[]>([]);
+  const [processingCount, setProcessingCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [expandedDocId, setExpandedDocId] = useState<number | null>(null);
+  const [searchFilter, setSearchFilter] = useState("");
   const [rows, setRows] = useState<ValidationRow[]>([]);
   const [loadingRows, setLoadingRows] = useState(false);
   const [editingRowId, setEditingRowId] = useState<number | null>(null);
@@ -102,6 +104,7 @@ export default function ValidationPage() {
       if (!silent) setLoading(true);
       const response = await api.get("/documents/pending-validation/list");
       const newDocs = response.data.documents || [];
+      setProcessingCount(response.data.processing_count || 0);
 
       if (silent) {
         // Background refresh: merge new docs without flashing the whole list
@@ -301,26 +304,10 @@ export default function ValidationPage() {
     }
   };
 
-  const bulkSetType = async (docId: number, newType: string) => {
-    try {
-      const response = await api.post(`/documents/${docId}/validation-rows/bulk-update-type`, {
-        transaction_type: newType,
-      });
-      // Refresh current page rows
-      await loadRows(docId, currentPage);
-      const typeLabels: Record<string, string> = { receita: "Receita", despesa: "Despesa", custo: "Custo", investimento: "Investimento", perda: "Perda" };
-      const label = typeLabels[newType] || newType;
-      toast.success(response.data.message || `Todas as linhas definidas como ${label}`);
-    } catch (error: any) {
-      console.error("Error bulk updating type:", error);
-      toast.error(error.response?.data?.detail || "Erro ao alterar tipo");
-    }
-  };
-
   const confirmAll = async (docId: number) => {
     try {
       setConfirming(true);
-      const response = await api.post(`/documents/${docId}/confirm-validation`);
+      const response = await api.post(`/documents/${docId}/confirm-validation`, {}, { timeout: 60000 });
       toast.success(response.data.message || "Documento validado com sucesso!");
 
       // Remove from list and reset
@@ -337,10 +324,11 @@ export default function ValidationPage() {
 
   const rejectDocument = async (docId: number) => {
     try {
+      // Large docs (2k+ rows) can take a few seconds to delete — use longer timeout
       await api.post(`/documents/${docId}/reject-validation`, {
         reason: "Rejeitado pelo usuário durante validação",
-      });
-      toast.info("Documento rejeitado");
+      }, { timeout: 30000 });
+      toast.info("Documento rejeitado e removido");
 
       // Remove from list
       setDocuments(prev => prev.filter(d => d.id !== docId));
@@ -454,11 +442,22 @@ export default function ValidationPage() {
                   Revise e confirme os dados extraídos antes de incluí-los nos relatórios
                 </p>
               </div>
-              {documents.length > 0 && (
-                <Badge className="bg-amber-500 text-white text-lg px-4 py-2">
-                  {documents.length} pendente{documents.length !== 1 ? "s" : ""}
-                </Badge>
-              )}
+              <div className="flex items-center gap-3">
+                {documents.length > 3 && (
+                  <input
+                    type="text"
+                    placeholder="Buscar por nome..."
+                    value={searchFilter}
+                    onChange={(e) => setSearchFilter(e.target.value)}
+                    className="px-3 py-2 text-sm bg-background text-foreground border border-border rounded-lg w-48 focus:ring-2 focus:ring-[#0d767b] focus:border-transparent"
+                  />
+                )}
+                {documents.length > 0 && (
+                  <Badge className="bg-amber-500 text-white text-lg px-4 py-2">
+                    {documents.length} pendente{documents.length !== 1 ? "s" : ""}
+                  </Badge>
+                )}
+              </div>
             </div>
           </div>
         </header>
@@ -473,20 +472,37 @@ export default function ValidationPage() {
             </div>
           ) : documents.length === 0 ? (
             <div className="text-center py-20">
-              <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto mb-4" />
-              <h2 className="text-xl font-semibold text-foreground">
-                Nenhum documento pendente
-              </h2>
-              <p className="text-muted-foreground mt-2 max-w-md mx-auto">
-                Após enviar documentos na página de Upload, eles aparecerão aqui automaticamente conforme ficarem prontos para validação.
-              </p>
+              {processingCount > 0 ? (
+                <>
+                  <Loader2 className="w-16 h-16 text-[#0d767b] dark:text-[#f86a15] mx-auto mb-4 animate-spin" />
+                  <h2 className="text-xl font-semibold text-foreground">
+                    {processingCount} documento{processingCount !== 1 ? 's' : ''} em processamento
+                  </h2>
+                  <p className="text-muted-foreground mt-2 max-w-md mx-auto">
+                    Aguarde, os documentos aparecerão aqui automaticamente conforme ficarem prontos.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto mb-4" />
+                  <h2 className="text-xl font-semibold text-foreground">
+                    Nenhum documento pendente
+                  </h2>
+                  <p className="text-muted-foreground mt-2 max-w-md mx-auto">
+                    Após enviar documentos na página de Upload, eles aparecerão aqui automaticamente conforme ficarem prontos para validação.
+                  </p>
+                </>
+              )}
             </div>
           ) : (
             <div className="space-y-4 w-full">
-              <p className="text-sm text-muted-foreground text-center">
-                Esta página atualiza automaticamente. Novos documentos aparecerão conforme ficarem prontos.
-              </p>
-              {documents.map((doc) => (
+              {processingCount > 0 && (
+                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded-lg py-2 px-4">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  {processingCount} documento{processingCount !== 1 ? 's' : ''} em processamento — aparecerão aqui automaticamente.
+                </div>
+              )}
+              {documents.filter(doc => !searchFilter || doc.file_name.toLowerCase().includes(searchFilter.toLowerCase())).map((doc) => (
                 <div
                   key={doc.id}
                   className="bg-card rounded-lg border-2 border-border shadow-sm overflow-hidden"
@@ -925,27 +941,7 @@ export default function ValidationPage() {
                           {/* Bulk actions toolbar */}
                           <div className="flex items-center justify-between px-4 py-2.5 bg-muted/20 border-t border-border">
                             <div className="flex items-center gap-1.5">
-                              <span className="text-xs text-muted-foreground font-medium">Tudo como:</span>
-                              <Button variant="outline" size="sm"
-                                className="text-green-600 border-green-300 hover:bg-green-50 dark:hover:bg-green-500/10 h-7 text-xs"
-                                onClick={() => bulkSetType(doc.id, "receita")} disabled={loadingRows}
-                              >Receita</Button>
-                              <Button variant="outline" size="sm"
-                                className="text-red-600 border-red-300 hover:bg-red-50 dark:hover:bg-red-500/10 h-7 text-xs"
-                                onClick={() => bulkSetType(doc.id, "despesa")} disabled={loadingRows}
-                              >Despesa</Button>
-                              <Button variant="outline" size="sm"
-                                className="text-orange-600 border-orange-300 hover:bg-orange-50 dark:hover:bg-orange-500/10 h-7 text-xs"
-                                onClick={() => bulkSetType(doc.id, "custo")} disabled={loadingRows}
-                              >Custo</Button>
-                              <Button variant="outline" size="sm"
-                                className="text-blue-600 border-blue-300 hover:bg-blue-50 dark:hover:bg-blue-500/10 h-7 text-xs"
-                                onClick={() => bulkSetType(doc.id, "investimento")} disabled={loadingRows}
-                              >Investimento</Button>
-                              <Button variant="outline" size="sm"
-                                className="text-gray-600 border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-500/10 h-7 text-xs"
-                                onClick={() => bulkSetType(doc.id, "perda")} disabled={loadingRows}
-                              >Perda</Button>
+                              <span className="text-xs text-muted-foreground font-medium">Ações:</span>
                             </div>
                             <div className="flex items-center gap-3">
                               <span className="text-sm text-muted-foreground">
