@@ -177,30 +177,43 @@ export default function DocumentList({ onDocumentChange }: DocumentListProps) {
     if (status === "failed" && doc) {
       if (doc.max_retries_exhausted) {
         return (
-          <Badge variant="secondary" className="text-base px-4 py-2 font-bold bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400 border-orange-300">
-            Falha Persistente
-          </Badge>
+          <span
+            title="Falha Persistente"
+            className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-orange-100 dark:bg-orange-900/30 text-lg cursor-help"
+          >
+            🚫
+          </span>
         );
       }
       if ((doc.retry_count ?? 0) > 0) {
         return (
-          <Badge variant="secondary" className="text-base px-4 py-2 font-bold bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border-blue-300">
-            Aguardando Retentativa
-          </Badge>
+          <span
+            title="Aguardando Retentativa"
+            className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 text-lg cursor-help"
+          >
+            🔄
+          </span>
         );
       }
     }
 
-    const variants: Record<string, { variant: any; label: string }> = {
-      completed: { variant: "default", label: "Concluído" },
-      pending: { variant: "secondary", label: "Pendente" },
-      processing: { variant: "secondary", label: "Processando" },
-      pending_validation: { variant: "secondary", label: "Validação Pendente" },
-      failed: { variant: "destructive", label: "Falhou" },
+    const statusEmojis: Record<string, { emoji: string; title: string; bg: string }> = {
+      completed: { emoji: "✅", title: "Concluído", bg: "bg-green-100 dark:bg-green-900/30" },
+      pending: { emoji: "⏳", title: "Pendente", bg: "bg-gray-100 dark:bg-gray-800/50" },
+      processing: { emoji: "⚙️", title: "Processando", bg: "bg-blue-100 dark:bg-blue-900/30" },
+      pending_validation: { emoji: "📋", title: "Validação Pendente", bg: "bg-amber-100 dark:bg-amber-900/30" },
+      failed: { emoji: "❌", title: "Falhou", bg: "bg-red-100 dark:bg-red-900/30" },
     };
 
-    const config = variants[status] || { variant: "secondary", label: status };
-    return <Badge variant={config.variant} className="text-base px-4 py-2 font-bold">{config.label}</Badge>;
+    const config = statusEmojis[status] || { emoji: "❓", title: status, bg: "bg-gray-100 dark:bg-gray-800/50" };
+    return (
+      <span
+        title={config.title}
+        className={`inline-flex items-center justify-center w-8 h-8 rounded-full ${config.bg} text-lg cursor-help ${status === 'processing' ? 'animate-pulse' : ''}`}
+      >
+        {config.emoji}
+      </span>
+    );
   };
 
   const getDocumentTypeLabel = (type: string) => {
@@ -574,7 +587,7 @@ export default function DocumentList({ onDocumentChange }: DocumentListProps) {
 
                   return (
                     <TableRow key={doc.id} className={`transition-colors hover:bg-accent ${idx % 2 === 0 ? 'bg-muted/50' : 'bg-card'}`}>
-                      <TableCell className="max-w-[260px] py-3">
+                      <TableCell className="max-w-[260px] py-4">
                         <div className="flex items-center gap-2">
                           {isLedger(doc) && (
                             <FileSpreadsheet className="h-5 w-5 text-[#0d767b] dark:text-[#0d767b] flex-shrink-0" />
@@ -601,8 +614,8 @@ export default function DocumentList({ onDocumentChange }: DocumentListProps) {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="py-3">
-                        <div className="flex flex-col gap-1">
+                      <TableCell className="py-4">
+                        <div className="flex flex-col gap-1 items-center">
                           {getStatusBadge(doc.status, doc)}
                           {doc.max_retries_exhausted && (
                             <span className="text-xs text-orange-600 dark:text-orange-400 font-medium">
@@ -611,7 +624,7 @@ export default function DocumentList({ onDocumentChange }: DocumentListProps) {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="text-sm py-3">
+                      <TableCell className="text-sm py-4">
                         {doc.extracted_data ? (
                           <div className="flex flex-col gap-1">
                             <span className="font-medium text-foreground">{getDocumentTypeLabel(doc.extracted_data.document_type)}</span>
@@ -625,7 +638,7 @@ export default function DocumentList({ onDocumentChange }: DocumentListProps) {
                           <span className="text-muted-foreground">-</span>
                         )}
                       </TableCell>
-                      <TableCell className="max-w-[180px] truncate text-sm py-3">
+                      <TableCell className="max-w-[180px] truncate text-sm py-4">
                         {ledger ? (
                           <span className="text-muted-foreground">Múltiplas partes</span>
                         ) : doc.client_name ? (
@@ -639,7 +652,7 @@ export default function DocumentList({ onDocumentChange }: DocumentListProps) {
                           <span className="text-muted-foreground">{(doc.extracted_data as any)?.issuer?.name || "-"}</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-base font-bold py-3">
+                      <TableCell className="text-base font-bold py-4">
                         {doc.extracted_data ? (
                           ledger ? (
                             <div>
@@ -662,22 +675,21 @@ export default function DocumentList({ onDocumentChange }: DocumentListProps) {
                           <span className="text-muted-foreground">-</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-sm font-medium text-foreground py-3 whitespace-nowrap">
+                      <TableCell className="text-sm font-medium text-foreground py-4 whitespace-nowrap">
                         {(doc.extracted_data as any)?.issue_date
                           ? formatDate((doc.extracted_data as any).issue_date)
                           : formatDate(doc.upload_date)}
                       </TableCell>
-                      <TableCell className="py-3">
-                        <div className="flex gap-1.5 justify-center items-center">
+                      <TableCell className="py-4 w-[60px]">
+                        <div className="flex flex-col gap-1 items-center">
                           {doc.status === "pending_validation" ? (
                             <Button
                               size="sm"
                               onClick={() => router.push("/validation")}
-                              className="bg-amber-500 hover:bg-amber-600 text-white"
+                              className="bg-amber-500 hover:bg-amber-600 text-white w-9 h-9 p-0"
                               title="Validar documento"
                             >
-                              <ClipboardCheck className="w-4 h-4 mr-1" />
-                              Validar
+                              <ClipboardCheck className="w-4 h-4" />
                             </Button>
                           ) : (
                             <>
@@ -686,17 +698,18 @@ export default function DocumentList({ onDocumentChange }: DocumentListProps) {
                                 variant="outline"
                                 onClick={() => handleView(doc)}
                                 title="Ver documento"
+                                className="w-9 h-9 p-0"
                               >
-                                👁️ Ver
+                                👁️
                               </Button>
                               <Button
                                 size="sm"
                                 variant="outline"
                                 onClick={() => handleEdit(doc)}
-                                className="border-[#0d767b] dark:border-[#f86a15] text-[#0d767b] dark:text-[#f86a15] hover:bg-[#0d767b]/10 dark:hover:bg-[#f86a15]/10"
+                                className="w-9 h-9 p-0 border-[#0d767b] dark:border-[#f86a15] text-[#0d767b] dark:text-[#f86a15] hover:bg-[#0d767b]/10 dark:hover:bg-[#f86a15]/10"
                                 title="Editar documento"
                               >
-                                ✏️ Editar
+                                ✏️
                               </Button>
                             </>
                           )}
@@ -706,9 +719,9 @@ export default function DocumentList({ onDocumentChange }: DocumentListProps) {
                               variant="outline"
                               onClick={() => handleRetry(doc.id)}
                               title="Reprocessar documento"
-                              className="border-blue-500 text-blue-600 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-950"
+                              className="w-9 h-9 p-0 border-blue-500 text-blue-600 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-950"
                             >
-                              🔄 Reprocessar
+                              🔄
                             </Button>
                           )}
                           <Button
@@ -716,6 +729,7 @@ export default function DocumentList({ onDocumentChange }: DocumentListProps) {
                             variant="destructive"
                             onClick={() => handleDeleteClick(doc.id)}
                             title="Excluir documento"
+                            className="w-9 h-9 p-0"
                           >
                             🗑️
                           </Button>

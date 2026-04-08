@@ -4,13 +4,16 @@ import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Download, FileText, FileSpreadsheet, Lock, Eye, Loader2 } from "lucide-react";
+import { Download, FileText, FileSpreadsheet, Lock, Eye, Loader2, CalendarIcon } from "lucide-react";
 import { InfoModal } from "@/components/ui/info-modal";
 import { toast } from "sonner";
 import { authTokens } from "@/lib/auth-api";
 import { api } from "@/lib/api";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { DatePicker, MonthPicker, YearPicker } from "@/components/ui/date-picker";
+import { format, parse } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 // DRE line item from /reports/dre endpoint
 interface DRELine {
@@ -90,6 +93,56 @@ interface CashFlowData {
   net_increase_in_cash: number;
   cash_beginning: number;
   cash_ending: number;
+}
+
+// Detailed daily cash flow from /reports/cash-flow/detailed endpoint
+interface DailyDREEntry {
+  day: string;
+  receita_bruta: number;
+  total_deducoes: number;
+  receita_liquida: number;
+  total_custos_variaveis: number;
+  margem_contribuicao: number;
+  custos_fixos_administrativos: number;
+  custos_fixos_comerciais: number;
+  custos_fixos_producao: number;
+  outras_despesas_fixas: number;
+  total_custos_fixos: number;
+  resultado_operacional: number;
+  receitas_nao_operacionais: number;
+  despesas_nao_operacionais: number;
+  resultado_nao_operacional: number;
+  resultado_liquido: number;
+  resultado_acumulado: number;
+}
+
+interface CashFlowDetailedData {
+  company_name: string | null;
+  cnpj: string | null;
+  start_date: string;
+  end_date: string;
+  period_type: string;
+  bank_entries: Record<string, Array<{
+    day: string;
+    opening_balance: number;
+    total_inflows: number;
+    total_outflows: number;
+    closing_balance: number;
+  }>>;
+  daily_dre: DailyDREEntry[];
+  monthly_totals: Record<string, {
+    receita_bruta: number;
+    margem_contribuicao: number;
+    resultado_operacional: number;
+    resultado_liquido: number;
+  }>;
+  transactions?: Array<{
+    date: string;
+    description: string;
+    category: string;
+    amount: number;
+    transaction_type: string;
+  }>;
 }
 
 const formatBRL = (value: number) =>
@@ -184,6 +237,7 @@ export default function AdvancedReports() {
   // User-configurable tab order (ensure indicadores is always present for users with old saved order)
   const savedOrder = (user?.report_tab_order || "dre,balanco,fluxo,indicadores").split(",") as string[];
   const tabOrder = savedOrder.includes("indicadores") ? savedOrder : [...savedOrder, "indicadores"];
+
   // Helper to get current month as YYYY-MM-01 (timezone-safe)
   const getCurrentMonth = () => {
     const now = new Date();
@@ -199,27 +253,22 @@ export default function AdvancedReports() {
     return `${year}-${month}`;
   };
 
-  // DRE state
-  const [drePeriodType, setDrePeriodType] = useState<string>("month");
-  const [dreStartDate, setDreStartDate] = useState<string>("");
-  const [dreEndDate, setDreEndDate] = useState<string>("");
-  const [dreReferenceDate, setDreReferenceDate] = useState<string>(getCurrentMonth());
-  const [dreLoading, setDreLoading] = useState(false);
+  // ===== UNIFIED DATE STATE (above all tabs) =====
+  const [periodType, setPeriodType] = useState<string>("month");
+  const [referenceDate, setReferenceDate] = useState<string>(getCurrentMonth());
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
 
-  // Balance Sheet state
-  const [balanceDate, setBalanceDate] = useState<string>(getCurrentMonthInput());
-  const [balanceLoading, setBalanceLoading] = useState(false);
-
-  // Cash Flow state
-  const [cashFlowPeriodType, setCashFlowPeriodType] = useState<string>("month");
-  const [cashFlowStartDate, setCashFlowStartDate] = useState<string>("");
-  const [cashFlowEndDate, setCashFlowEndDate] = useState<string>("");
-  const [cashFlowReferenceDate, setCashFlowReferenceDate] = useState<string>(getCurrentMonth());
+  // Cash flow method stays inside its tab
   const [cashFlowMethod, setCashFlowMethod] = useState<string>("indirect");
+
+  // Loading states
+  const [dreLoading, setDreLoading] = useState(false);
+  const [balanceLoading, setBalanceLoading] = useState(false);
   const [cashFlowLoading, setCashFlowLoading] = useState(false);
+  const [allReportsLoading, setAllReportsLoading] = useState(false);
 
   // Indicators state
-  const [indicatorsDate, setIndicatorsDate] = useState<string>(getCurrentMonthInput());
   const [indicatorsData, setIndicatorsData] = useState<any>(null);
   const [indicatorsLoading, setIndicatorsLoading] = useState(false);
 
@@ -232,9 +281,22 @@ export default function AdvancedReports() {
   const [balanceInlineLoading, setBalanceInlineLoading] = useState(false);
   const [cashFlowData, setCashFlowData] = useState<CashFlowData | null>(null);
   const [cashFlowInlineLoading, setCashFlowInlineLoading] = useState(false);
+  const [cashFlowDetailedData, setCashFlowDetailedData] = useState<CashFlowDetailedData | null>(null);
 
   // Track if auto-load has run
   const autoLoaded = useRef(false);
+
+  // Backward-compat aliases: reports use the unified date
+  const drePeriodType = periodType;
+  const dreReferenceDate = referenceDate;
+  const dreStartDate = startDate;
+  const dreEndDate = endDate;
+  const cashFlowPeriodType = periodType;
+  const cashFlowReferenceDate = referenceDate;
+  const cashFlowStartDate = startDate;
+  const cashFlowEndDate = endDate;
+  const balanceDate = referenceDate ? referenceDate.slice(0, 7) : getCurrentMonthInput();
+  const indicatorsDate = referenceDate ? referenceDate.slice(0, 7) : getCurrentMonthInput();
 
   // Export DRE
   const exportDRE = async (format: 'pdf' | 'excel' | 'csv') => {
@@ -546,6 +608,14 @@ export default function AdvancedReports() {
       }
       const res = await api.get(`/reports/cash-flow?${params.toString()}`);
       setCashFlowData(res.data);
+
+      // Also fetch detailed daily cash flow (non-blocking)
+      const detailParams = new URLSearchParams(params);
+      // Remove method param — detailed endpoint doesn't use it
+      detailParams.delete('method');
+      api.get(`/reports/cash-flow/detailed?${detailParams.toString()}`)
+        .then((detailRes: any) => setCashFlowDetailedData(detailRes.data))
+        .catch(() => setCashFlowDetailedData(null));
     } catch (error: any) {
       console.error('Error loading cash flow:', error);
       toast.error(error.response?.data?.detail || 'Erro ao carregar Fluxo de Caixa');
@@ -554,13 +624,17 @@ export default function AdvancedReports() {
     }
   };
 
-  // Load Financial Indicators
+  // Load Financial Indicators (now uses unified period)
   const loadIndicators = async () => {
     setIndicatorsLoading(true);
     try {
       const params = new URLSearchParams();
-      if (indicatorsDate) {
-        params.append('reference_date', `${indicatorsDate}-01`);
+      params.append('period_type', periodType);
+      if (periodType === 'custom') {
+        if (startDate) params.append('start_date', startDate);
+        if (endDate) params.append('end_date', endDate);
+      } else if (referenceDate) {
+        params.append('reference_date', referenceDate);
       }
       const res = await api.get(`/reports/indicators?${params.toString()}`);
       setIndicatorsData(res.data);
@@ -569,6 +643,21 @@ export default function AdvancedReports() {
       toast.error(error.response?.data?.detail || 'Erro ao carregar indicadores');
     } finally {
       setIndicatorsLoading(false);
+    }
+  };
+
+  // Load ALL reports at once (unified date picker action)
+  const loadAllReports = async () => {
+    setAllReportsLoading(true);
+    try {
+      await Promise.all([
+        loadDREInline(),
+        loadBalanceInline(),
+        loadCashFlowInline(),
+        loadIndicators(),
+      ]);
+    } finally {
+      setAllReportsLoading(false);
     }
   };
 
@@ -603,46 +692,130 @@ export default function AdvancedReports() {
     );
   };
 
-  // Auto-load the default tab's report on mount
+  // Auto-load all reports on mount
   useEffect(() => {
     if (autoLoaded.current) return;
     autoLoaded.current = true;
-    const firstTab = tabOrder[0];
-    if (firstTab === "balanco") {
-      loadBalanceInline();
-    } else if (firstTab === "fluxo") {
-      loadCashFlowInline();
-    } else if (firstTab === "indicadores") {
-      loadIndicators();
-    } else {
-      // Default: DRE
-      loadDREInline();
-    }
+    loadAllReports();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
     <div className="space-y-6">
+      {/* Header + Unified Date Picker */}
       <Card>
         <CardHeader>
           <CardTitle className="text-3xl">📊 Relatórios Gerenciais</CardTitle>
           <CardDescription className="text-lg mt-2">
-            Gere DRE, Balanço Gerencial e outros relatórios financeiros
+            Selecione o período e visualize todos os relatórios financeiros
           </CardDescription>
         </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Period Type Selector */}
+          <div>
+            <label className="block text-base font-semibold text-foreground mb-3">Tipo de Período</label>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              {[
+                { value: 'day', label: '📅 Dia' },
+                { value: 'week', label: '📆 Semana' },
+                { value: 'month', label: '🗓️ Mês' },
+                { value: 'year', label: '📊 Ano' },
+                { value: 'custom', label: '🔧 Customizado' },
+              ].map((option) => (
+                <Button
+                  key={option.value}
+                  variant={periodType === option.value ? "default" : "outline"}
+                  onClick={() => setPeriodType(option.value)}
+                  className="text-base px-4 py-6 h-auto"
+                >
+                  {option.label}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          {/* Conditional Date Inputs */}
+          {periodType === 'custom' ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-muted-foreground mb-2">Data Inicial</label>
+                <DatePicker
+                  value={startDate ? new Date(startDate + 'T12:00:00') : undefined}
+                  onChange={(d) => setStartDate(d ? format(d, 'yyyy-MM-dd') : '')}
+                  placeholder="Selecione a data inicial"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-muted-foreground mb-2">Data Final</label>
+                <DatePicker
+                  value={endDate ? new Date(endDate + 'T12:00:00') : undefined}
+                  onChange={(d) => setEndDate(d ? format(d, 'yyyy-MM-dd') : '')}
+                  placeholder="Selecione a data final"
+                />
+              </div>
+            </div>
+          ) : periodType === 'month' ? (
+            <div>
+              <label className="block text-sm font-medium text-muted-foreground mb-2">
+                Selecione o Mês/Ano
+              </label>
+              <MonthPicker
+                value={referenceDate ? referenceDate.slice(0, 7) : getCurrentMonthInput()}
+                onChange={(v) => setReferenceDate(v ? `${v}-01` : getCurrentMonth())}
+              />
+              <p className="text-sm text-muted-foreground mt-2">
+                Todos os relatórios serão gerados para o mês selecionado
+              </p>
+            </div>
+          ) : periodType === 'year' ? (
+            <div>
+              <label className="block text-sm font-medium text-muted-foreground mb-2">
+                Selecione o Ano
+              </label>
+              <YearPicker
+                value={referenceDate ? referenceDate.slice(0, 4) : String(new Date().getFullYear())}
+                onChange={(v) => setReferenceDate(`${v}-01-01`)}
+              />
+              <p className="text-sm text-muted-foreground mt-2">
+                Todos os relatórios serão gerados para o ano selecionado
+              </p>
+            </div>
+          ) : (
+            <div>
+              <label className="block text-sm font-medium text-muted-foreground mb-2">
+                {periodType === 'week' ? 'Selecione qualquer dia da semana desejada' : 'Selecione o dia'}
+              </label>
+              <DatePicker
+                value={referenceDate ? new Date(referenceDate + 'T12:00:00') : new Date()}
+                onChange={(d) => setReferenceDate(d ? format(d, 'yyyy-MM-dd') : getCurrentMonth())}
+                placeholder={periodType === 'week' ? 'Dia da semana desejada' : 'Selecione o dia'}
+              />
+              <p className="text-sm text-muted-foreground mt-2">
+                {periodType === 'week' && 'Relatórios da semana (segunda a domingo) que contém esta data'}
+                {periodType === 'day' && 'Relatórios deste dia específico'}
+              </p>
+            </div>
+          )}
+
+          {/* Unified Visualizar Button */}
+          <div className="border-t pt-6">
+            <Button
+              onClick={loadAllReports}
+              disabled={allReportsLoading}
+              className="bg-blue-600 hover:bg-blue-700 text-white text-lg px-8 py-6 h-auto w-full md:w-auto"
+            >
+              {allReportsLoading ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <Eye className="w-5 h-5 mr-2" />}
+              {allReportsLoading ? 'Carregando todos os relatórios...' : 'Visualizar Relatórios'}
+            </Button>
+          </div>
+        </CardContent>
       </Card>
 
       <Tabs defaultValue={
         tabOrder[0] === "balanco" ? "balance" :
         tabOrder[0] === "fluxo" ? "cashflow" :
         tabOrder[0] === "indicadores" ? "indicators" : "dre"
-      } onValueChange={(tab) => {
-        // Auto-load report data when switching to a tab that hasn't been loaded yet
-        if (tab === "dre" && !dreData && !dreInlineLoading) loadDREInline();
-        if (tab === "balance" && !balanceData && !balanceInlineLoading) loadBalanceInline();
-        if (tab === "cashflow" && !cashFlowData && !cashFlowInlineLoading) loadCashFlowInline();
-        if (tab === "indicators" && !indicatorsData && !indicatorsLoading) loadIndicators();
-      }} className="space-y-6">
+      } className="space-y-6">
         <TabsList className="w-full p-3 h-auto bg-muted/50 border-2 border-border rounded-lg flex flex-col sm:flex-row gap-3">
           {tabOrder.map((tab) => {
             const triggerClass = "flex-1 text-lg px-6 py-6 font-bold gap-2.5 w-full rounded-md border-2 border-transparent data-[state=active]:border-[#0d767b] data-[state=active]:bg-[#0d767b]/10 dark:data-[state=active]:border-[#f86a15] dark:data-[state=active]:bg-[#f86a15]/10 data-[state=active]:shadow-md hover:bg-accent/80 transition-all";
@@ -700,113 +873,8 @@ export default function AdvancedReports() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Period Type Selector */}
-              <div>
-                <label className="block text-base font-semibold text-foreground mb-3">Tipo de Período</label>
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                  {[
-                    { value: 'day', label: '📅 Dia' },
-                    { value: 'week', label: '📆 Semana' },
-                    { value: 'month', label: '🗓️ Mês' },
-                    { value: 'year', label: '📊 Ano' },
-                    { value: 'custom', label: '🔧 Customizado' },
-                  ].map((option) => (
-                    <Button
-                      key={option.value}
-                      variant={drePeriodType === option.value ? "default" : "outline"}
-                      onClick={() => setDrePeriodType(option.value)}
-                      className="text-base px-4 py-6 h-auto"
-                    >
-                      {option.label}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Conditional Inputs */}
-              {drePeriodType === 'custom' ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-2">Data Inicial</label>
-                    <input
-                      type="date"
-                      value={dreStartDate}
-                      onChange={(e) => setDreStartDate(e.target.value)}
-                      className="w-full px-4 py-3 text-base border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-background text-foreground"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-2">Data Final</label>
-                    <input
-                      type="date"
-                      value={dreEndDate}
-                      onChange={(e) => setDreEndDate(e.target.value)}
-                      className="w-full px-4 py-3 text-base border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-background text-foreground"
-                    />
-                  </div>
-                </div>
-              ) : drePeriodType === 'month' ? (
-                <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-2">
-                    Selecione o Mês/Ano
-                  </label>
-                  <input
-                    type="month"
-                    value={dreReferenceDate ? dreReferenceDate.slice(0, 7) : getCurrentMonthInput()}
-                    onChange={(e) => setDreReferenceDate(e.target.value ? `${e.target.value}-01` : getCurrentMonth())}
-                    className="w-full px-4 py-3 text-base border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-background text-foreground"
-                  />
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Será gerado o DRE do mês selecionado
-                  </p>
-                </div>
-              ) : drePeriodType === 'year' ? (
-                <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-2">
-                    Selecione o Ano
-                  </label>
-                  <select
-                    value={dreReferenceDate ? dreReferenceDate.slice(0, 4) : String(new Date().getFullYear())}
-                    onChange={(e) => setDreReferenceDate(`${e.target.value}-01-01`)}
-                    className="w-full px-4 py-3 text-base border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-background text-foreground"
-                  >
-                    {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i).map(y => (
-                      <option key={y} value={y}>{y}</option>
-                    ))}
-                  </select>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Será gerado o DRE do ano selecionado
-                  </p>
-                </div>
-              ) : (
-                <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-2">
-                    {drePeriodType === 'week' ? 'Selecione qualquer dia da semana desejada' : 'Selecione o dia'}
-                  </label>
-                  <input
-                    type="date"
-                    value={dreReferenceDate}
-                    onChange={(e) => setDreReferenceDate(e.target.value)}
-                    className="w-full px-4 py-3 text-base border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-background text-foreground"
-                  />
-                  <p className="text-sm text-muted-foreground mt-2">
-                    {drePeriodType === 'week' && 'Será gerado o DRE da semana (segunda a domingo) que contém esta data'}
-                    {drePeriodType === 'day' && 'Será gerado o DRE deste dia específico'}
-                  </p>
-                </div>
-              )}
-
-              {/* Visualize + Export */}
-              <div className="border-t pt-6 space-y-4">
-                <div className="flex flex-wrap gap-3">
-                  <Button
-                    onClick={loadDREInline}
-                    disabled={dreInlineLoading}
-                    className="bg-blue-600 hover:bg-blue-700 text-white text-lg px-8 py-6 h-auto"
-                  >
-                    {dreInlineLoading ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <Eye className="w-5 h-5 mr-2" />}
-                    {dreInlineLoading ? 'Carregando...' : 'Visualizar DRE'}
-                  </Button>
+              {/* Export Buttons */}
+              <div className="flex flex-wrap gap-3">
                   <Button
                     onClick={() => exportDRE('excel')}
                     disabled={dreLoading}
@@ -824,7 +892,6 @@ export default function AdvancedReports() {
                     <FileText className="w-5 h-5 mr-2" />
                     {dreLoading ? 'Gerando...' : 'Baixar PDF'}
                   </Button>
-                </div>
               </div>
 
               {/* Inline DRE Table */}
@@ -940,32 +1007,8 @@ export default function AdvancedReports() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-muted-foreground mb-2">
-                  Mês/Ano de Referência
-                </label>
-                <input
-                  type="month"
-                  value={balanceDate || getCurrentMonthInput()}
-                  onChange={(e) => setBalanceDate(e.target.value || getCurrentMonthInput())}
-                  className="w-full px-4 py-3 text-base border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-background text-foreground"
-                />
-                <p className="text-sm text-muted-foreground mt-2">
-                  O Balanço será gerado com a posição ao final do mês selecionado
-                </p>
-              </div>
-
-              {/* Visualize + Export */}
-              <div className="border-t pt-6 space-y-4">
-                <div className="flex flex-wrap gap-3">
-                  <Button
-                    onClick={loadBalanceInline}
-                    disabled={balanceInlineLoading}
-                    className="bg-blue-600 hover:bg-blue-700 text-white text-lg px-8 py-6 h-auto"
-                  >
-                    {balanceInlineLoading ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <Eye className="w-5 h-5 mr-2" />}
-                    {balanceInlineLoading ? 'Carregando...' : 'Visualizar Balanço'}
-                  </Button>
+              {/* Export Buttons */}
+              <div className="flex flex-wrap gap-3">
                   <Button
                     onClick={() => exportBalanceSheet('excel')}
                     disabled={balanceLoading}
@@ -983,7 +1026,6 @@ export default function AdvancedReports() {
                     <FileText className="w-5 h-5 mr-2" />
                     {balanceLoading ? 'Gerando...' : 'Baixar PDF'}
                   </Button>
-                </div>
               </div>
 
               {/* Inline Balance Sheet — Side-by-side template layout */}
@@ -1238,9 +1280,9 @@ export default function AdvancedReports() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Method Selector */}
+              {/* Method Selector (stays in this tab) */}
               <div>
-                <label className="block text-base font-semibold text-foreground mb-3">Método de Cálculo</label>
+                <label className="block text-base font-semibold text-foreground mb-3">Método de Cálculo (CPC 03)</label>
                 {hasCashFlowAccess ? (
                   <>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1286,113 +1328,8 @@ export default function AdvancedReports() {
                 )}
               </div>
 
-              {/* Period Type Selector */}
-              <div>
-                <label className="block text-base font-semibold text-foreground mb-3">Tipo de Período</label>
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                  {[
-                    { value: 'day', label: '📅 Dia' },
-                    { value: 'week', label: '📆 Semana' },
-                    { value: 'month', label: '🗓️ Mês' },
-                    { value: 'year', label: '📊 Ano' },
-                    { value: 'custom', label: '🔧 Customizado' },
-                  ].map((option) => (
-                    <Button
-                      key={option.value}
-                      variant={cashFlowPeriodType === option.value ? "default" : "outline"}
-                      onClick={() => setCashFlowPeriodType(option.value)}
-                      className="text-base px-4 py-6 h-auto"
-                    >
-                      {option.label}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Conditional Inputs */}
-              {cashFlowPeriodType === 'custom' ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-2">Data Inicial</label>
-                    <input
-                      type="date"
-                      value={cashFlowStartDate}
-                      onChange={(e) => setCashFlowStartDate(e.target.value)}
-                      className="w-full px-4 py-3 text-base border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-background text-foreground"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-2">Data Final</label>
-                    <input
-                      type="date"
-                      value={cashFlowEndDate}
-                      onChange={(e) => setCashFlowEndDate(e.target.value)}
-                      className="w-full px-4 py-3 text-base border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-background text-foreground"
-                    />
-                  </div>
-                </div>
-              ) : cashFlowPeriodType === 'month' ? (
-                <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-2">
-                    Selecione o Mês/Ano
-                  </label>
-                  <input
-                    type="month"
-                    value={cashFlowReferenceDate ? cashFlowReferenceDate.slice(0, 7) : getCurrentMonthInput()}
-                    onChange={(e) => setCashFlowReferenceDate(e.target.value ? `${e.target.value}-01` : getCurrentMonth())}
-                    className="w-full px-4 py-3 text-base border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-background text-foreground"
-                  />
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Será gerado o Fluxo de Caixa do mês selecionado
-                  </p>
-                </div>
-              ) : cashFlowPeriodType === 'year' ? (
-                <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-2">
-                    Selecione o Ano
-                  </label>
-                  <select
-                    value={cashFlowReferenceDate ? cashFlowReferenceDate.slice(0, 4) : String(new Date().getFullYear())}
-                    onChange={(e) => setCashFlowReferenceDate(`${e.target.value}-01-01`)}
-                    className="w-full px-4 py-3 text-base border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-background text-foreground"
-                  >
-                    {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i).map(y => (
-                      <option key={y} value={y}>{y}</option>
-                    ))}
-                  </select>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Será gerado o Fluxo de Caixa do ano selecionado
-                  </p>
-                </div>
-              ) : (
-                <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-2">
-                    {cashFlowPeriodType === 'week' ? 'Selecione qualquer dia da semana desejada' : 'Selecione o dia'}
-                  </label>
-                  <input
-                    type="date"
-                    value={cashFlowReferenceDate}
-                    onChange={(e) => setCashFlowReferenceDate(e.target.value)}
-                    className="w-full px-4 py-3 text-base border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-background text-foreground"
-                  />
-                  <p className="text-sm text-muted-foreground mt-2">
-                    {cashFlowPeriodType === 'week' && 'Será gerado o Fluxo de Caixa da semana (segunda a domingo) que contém esta data'}
-                    {cashFlowPeriodType === 'day' && 'Será gerado o Fluxo de Caixa deste dia específico'}
-                  </p>
-                </div>
-              )}
-
-              {/* Visualize + Export */}
-              <div className="border-t pt-6 space-y-4">
-                <div className="flex flex-wrap gap-3">
-                  <Button
-                    onClick={loadCashFlowInline}
-                    disabled={cashFlowInlineLoading}
-                    className="bg-blue-600 hover:bg-blue-700 text-white text-lg px-8 py-6 h-auto"
-                  >
-                    {cashFlowInlineLoading ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <Eye className="w-5 h-5 mr-2" />}
-                    {cashFlowInlineLoading ? 'Carregando...' : 'Visualizar Fluxo'}
-                  </Button>
+              {/* Export Buttons */}
+              <div className="flex flex-wrap gap-3">
                   <Button
                     onClick={() => exportCashFlow('excel')}
                     disabled={cashFlowLoading}
@@ -1410,7 +1347,6 @@ export default function AdvancedReports() {
                     <FileText className="w-5 h-5 mr-2" />
                     {cashFlowLoading ? 'Gerando...' : 'Baixar PDF'}
                   </Button>
-                </div>
               </div>
 
               {/* Inline Cash Flow Display */}
@@ -1478,6 +1414,155 @@ export default function AdvancedReports() {
                 </div>
               )}
 
+              {/* Detailed Daily/Monthly Cash Flow Breakdown */}
+              {cashFlowDetailedData && (
+                <div className="border-t pt-6">
+                  <h3 className="text-lg font-semibold text-foreground mb-4">
+                    {periodType === 'year' ? 'Detalhamento Mensal' :
+                     periodType === 'day' ? 'Transações do Dia' :
+                     'Detalhamento Diário'}
+                  </h3>
+
+                  {/* Year view: monthly totals table */}
+                  {periodType === 'year' && Object.keys(cashFlowDetailedData.monthly_totals).length > 0 && (
+                    <div className="overflow-x-auto rounded-lg border border-border">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-muted/50">
+                            <th className="text-left px-4 py-3 font-semibold text-foreground">Mês</th>
+                            <th className="text-right px-3 py-3 font-semibold text-foreground">Receita Bruta</th>
+                            <th className="text-right px-3 py-3 font-semibold text-foreground">Margem Contrib.</th>
+                            <th className="text-right px-3 py-3 font-semibold text-foreground">Res. Operacional</th>
+                            <th className="text-right px-3 py-3 font-semibold text-foreground">Res. Líquido</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {Object.entries(cashFlowDetailedData.monthly_totals)
+                            .sort(([a], [b]) => a.localeCompare(b))
+                            .map(([monthKey, data]) => (
+                            <tr key={monthKey} className="hover:bg-accent/30">
+                              <td className="px-4 py-2 font-medium text-foreground">
+                                {format(new Date(monthKey + '-01T12:00:00'), 'MMM/yyyy', { locale: ptBR })}
+                              </td>
+                              <td className="px-3 py-2 text-right tabular-nums">{formatBRL(data.receita_bruta)}</td>
+                              <td className={`px-3 py-2 text-right tabular-nums ${data.margem_contribuicao < 0 ? 'text-red-600 dark:text-red-400' : ''}`}>
+                                {formatBRL(data.margem_contribuicao)}
+                              </td>
+                              <td className={`px-3 py-2 text-right tabular-nums ${data.resultado_operacional < 0 ? 'text-red-600 dark:text-red-400' : ''}`}>
+                                {formatBRL(data.resultado_operacional)}
+                              </td>
+                              <td className={`px-3 py-2 text-right tabular-nums font-semibold ${data.resultado_liquido < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                                {formatBRL(data.resultado_liquido)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {/* Day view: transaction list */}
+                  {periodType === 'day' && cashFlowDetailedData.transactions && (
+                    <div className="overflow-x-auto rounded-lg border border-border">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-muted/50">
+                            <th className="text-left px-4 py-3 font-semibold text-foreground">Descrição</th>
+                            <th className="text-left px-3 py-3 font-semibold text-foreground">Categoria</th>
+                            <th className="text-left px-3 py-3 font-semibold text-foreground">Tipo</th>
+                            <th className="text-right px-4 py-3 font-semibold text-foreground">Valor</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {cashFlowDetailedData.transactions.map((txn, i) => (
+                            <tr key={i} className="hover:bg-accent/30">
+                              <td className="px-4 py-2 text-foreground">{txn.description || '-'}</td>
+                              <td className="px-3 py-2 text-muted-foreground text-xs">{txn.category}</td>
+                              <td className="px-3 py-2">
+                                <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                                  ['receita', 'income'].includes(txn.transaction_type)
+                                    ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                                    : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                                }`}>
+                                  {txn.transaction_type}
+                                </span>
+                              </td>
+                              <td className={`px-4 py-2 text-right tabular-nums font-semibold ${
+                                ['receita', 'income'].includes(txn.transaction_type)
+                                  ? 'text-green-600 dark:text-green-400'
+                                  : 'text-red-600 dark:text-red-400'
+                              }`}>
+                                {formatBRL(txn.amount)}
+                              </td>
+                            </tr>
+                          ))}
+                          {cashFlowDetailedData.transactions.length === 0 && (
+                            <tr>
+                              <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
+                                Nenhuma transação encontrada para este dia
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {/* Month/Week/Custom view: daily breakdown table */}
+                  {!['year', 'day'].includes(periodType) && cashFlowDetailedData.daily_dre.length > 0 && (
+                    <div className="overflow-x-auto rounded-lg border border-border">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-muted/50">
+                            <th className="text-left px-3 py-3 font-semibold text-foreground sticky left-0 bg-muted/50">Dia</th>
+                            <th className="text-right px-2 py-3 font-semibold text-foreground whitespace-nowrap">Rec. Bruta</th>
+                            <th className="text-right px-2 py-3 font-semibold text-foreground whitespace-nowrap">Deduções</th>
+                            <th className="text-right px-2 py-3 font-semibold text-foreground whitespace-nowrap">Rec. Líq.</th>
+                            <th className="text-right px-2 py-3 font-semibold text-foreground whitespace-nowrap">Custos Var.</th>
+                            <th className="text-right px-2 py-3 font-semibold text-foreground whitespace-nowrap">Margem C.</th>
+                            <th className="text-right px-2 py-3 font-semibold text-foreground whitespace-nowrap">Custos Fix.</th>
+                            <th className="text-right px-2 py-3 font-semibold text-foreground whitespace-nowrap">Res. Op.</th>
+                            <th className="text-right px-2 py-3 font-semibold text-foreground whitespace-nowrap">Res. Líq.</th>
+                            <th className="text-right px-2 py-3 font-semibold text-foreground whitespace-nowrap">Acumulado</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {cashFlowDetailedData.daily_dre.map((entry, i) => {
+                            const hasData = entry.receita_bruta !== 0 || entry.total_custos_variaveis !== 0 ||
+                              entry.total_custos_fixos !== 0 || entry.receitas_nao_operacionais !== 0 ||
+                              entry.despesas_nao_operacionais !== 0;
+                            return (
+                              <tr key={i} className={`${hasData ? 'hover:bg-accent/30' : 'opacity-40'}`}>
+                                <td className="px-3 py-1.5 font-medium text-foreground sticky left-0 bg-card whitespace-nowrap">
+                                  {format(new Date(entry.day + 'T12:00:00'), 'dd/MM (EEE)', { locale: ptBR })}
+                                </td>
+                                <td className="px-2 py-1.5 text-right tabular-nums">{entry.receita_bruta ? formatBRL(entry.receita_bruta) : '-'}</td>
+                                <td className="px-2 py-1.5 text-right tabular-nums text-red-600 dark:text-red-400">{entry.total_deducoes ? formatBRL(-entry.total_deducoes) : '-'}</td>
+                                <td className="px-2 py-1.5 text-right tabular-nums">{entry.receita_liquida ? formatBRL(entry.receita_liquida) : '-'}</td>
+                                <td className="px-2 py-1.5 text-right tabular-nums text-red-600 dark:text-red-400">{entry.total_custos_variaveis ? formatBRL(-entry.total_custos_variaveis) : '-'}</td>
+                                <td className={`px-2 py-1.5 text-right tabular-nums ${entry.margem_contribuicao < 0 ? 'text-red-600 dark:text-red-400' : ''}`}>
+                                  {entry.margem_contribuicao ? formatBRL(entry.margem_contribuicao) : '-'}
+                                </td>
+                                <td className="px-2 py-1.5 text-right tabular-nums text-red-600 dark:text-red-400">{entry.total_custos_fixos ? formatBRL(-entry.total_custos_fixos) : '-'}</td>
+                                <td className={`px-2 py-1.5 text-right tabular-nums font-medium ${entry.resultado_operacional < 0 ? 'text-red-600 dark:text-red-400' : ''}`}>
+                                  {entry.resultado_operacional ? formatBRL(entry.resultado_operacional) : '-'}
+                                </td>
+                                <td className={`px-2 py-1.5 text-right tabular-nums font-semibold ${entry.resultado_liquido < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                                  {entry.resultado_liquido ? formatBRL(entry.resultado_liquido) : '-'}
+                                </td>
+                                <td className={`px-2 py-1.5 text-right tabular-nums font-bold ${entry.resultado_acumulado < 0 ? 'text-red-600 dark:text-red-400' : 'text-blue-600 dark:text-blue-400'}`}>
+                                  {formatBRL(entry.resultado_acumulado)}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Info Box */}
               <div className="bg-green-500/5 border border-green-200 dark:border-green-800 rounded-lg p-6">
                 <h4 className="text-lg font-semibold text-foreground mb-2">ℹ️ Sobre o Fluxo de Caixa</h4>
@@ -1504,26 +1589,6 @@ export default function AdvancedReports() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="flex flex-wrap items-end gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1 text-foreground">Mês de referência</label>
-                  <input
-                    type="month"
-                    className="px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:ring-2 focus:ring-[#0d767b]/30 focus:border-[#0d767b]"
-                    value={indicatorsDate}
-                    onChange={(e) => setIndicatorsDate(e.target.value)}
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">Indicadores calculados para o mês selecionado</p>
-                </div>
-                <button
-                  className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-[#0d767b] to-[#095a5e] dark:from-[#d15a12] dark:to-[#fa8c4a] text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all hover:scale-[1.02]"
-                  onClick={loadIndicators}
-                  disabled={indicatorsLoading}
-                >
-                  {indicatorsLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Eye className="w-5 h-5" />}
-                  {indicatorsLoading ? 'Calculando...' : 'Calcular Indicadores'}
-                </button>
-              </div>
 
               {indicatorsData && (
                 <div className="space-y-6">
@@ -1561,7 +1626,7 @@ export default function AdvancedReports() {
                                       }
                                     </span>
                                   ) : (
-                                    <span className="text-sm text-muted-foreground">—</span>
+                                    <span className="text-sm text-muted-foreground" title="Dados insuficientes para calcular este indicador no período selecionado">N/A</span>
                                   )}
                                 </div>
                               </div>

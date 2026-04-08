@@ -21,6 +21,8 @@ import {
   Plus,
   Pencil,
   Sparkles,
+  AlertTriangle,
+  ShieldAlert,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,6 +39,8 @@ interface ValidationDocument {
   category: string | null;
   validation_row_count: number;
   validated_count: number;
+  cnpj_mismatch?: boolean;
+  cnpj_warning_message?: string | null;
 }
 
 interface ValidationRow {
@@ -103,6 +107,9 @@ export default function ValidationPage() {
   const [knownMatches, setKnownMatches] = useState<Record<string, KnownItemMatch>>({});
   const [editingAliasRowId, setEditingAliasRowId] = useState<number | null>(null);
   const [aliasInput, setAliasInput] = useState("");
+
+  // CNPJ mismatch confirmation modal
+  const [cnpjConfirmDocId, setCnpjConfirmDocId] = useState<number | null>(null);
 
   const loadDocuments = useCallback(async (silent = false) => {
     try {
@@ -551,6 +558,21 @@ export default function ValidationPage() {
                       )}
                     </div>
                   </button>
+
+                  {/* CNPJ Mismatch Warning Banner — always visible, not just when expanded */}
+                  {doc.cnpj_mismatch && !(doc.file_type === 'xlsx' || doc.file_type === 'xls' || doc.file_name?.match(/\.xlsx?$/i)) && (
+                    <div className="flex items-center gap-3 px-4 py-3 bg-red-50 dark:bg-red-950/30 border-t-2 border-b-2 border-red-400 dark:border-red-600">
+                      <ShieldAlert className="w-7 h-7 text-red-600 dark:text-red-400 flex-shrink-0" />
+                      <div className="flex-1">
+                        <p className="text-base font-bold text-red-700 dark:text-red-300">
+                          Este documento NÃO contém o CNPJ da sua empresa!
+                        </p>
+                        <p className="text-sm text-red-600 dark:text-red-400 mt-0.5">
+                          {doc.cnpj_warning_message || "O CNPJ do emissor/destinatário não corresponde ao CNPJ cadastrado na sua organização. Verifique se este documento pertence à sua empresa antes de aprovar."}
+                        </p>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Expanded: Validation Rows */}
                   {expandedDocId === doc.id && (
@@ -1107,7 +1129,15 @@ export default function ValidationPage() {
                               Rejeitar
                             </Button>
                             <Button
-                              onClick={() => confirmAll(doc.id)}
+                              onClick={() => {
+                                // XLSX files won't have the user's CNPJ — skip check for those
+                                const isXlsx = doc.file_type === 'xlsx' || doc.file_type === 'xls' || doc.file_name?.match(/\.xlsx?$/i);
+                                if (doc.cnpj_mismatch && !isXlsx) {
+                                  setCnpjConfirmDocId(doc.id);
+                                } else {
+                                  confirmAll(doc.id);
+                                }
+                              }}
                               disabled={confirming}
                               className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-600 text-white"
                             >
@@ -1128,6 +1158,52 @@ export default function ValidationPage() {
             </div>
           )}
           </SubscriptionGuard>
+
+          {/* CNPJ Mismatch Confirmation Modal */}
+          {cnpjConfirmDocId !== null && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+              <div className="bg-card border-2 border-red-400 dark:border-red-600 rounded-xl shadow-2xl max-w-lg w-full mx-4 overflow-hidden">
+                <div className="bg-red-50 dark:bg-red-950/50 px-6 py-5 flex items-center gap-4">
+                  <ShieldAlert className="w-10 h-10 text-red-600 dark:text-red-400 flex-shrink-0" />
+                  <div>
+                    <h3 className="text-xl font-bold text-red-700 dark:text-red-300">
+                      Atenção: CNPJ não encontrado!
+                    </h3>
+                    <p className="text-sm text-red-600 dark:text-red-400 mt-1">
+                      Este documento não contém o CNPJ da sua empresa
+                    </p>
+                  </div>
+                </div>
+                <div className="px-6 py-5 space-y-4">
+                  <p className="text-foreground text-base">
+                    Tem certeza que deseja aprovar este documento? O CNPJ do emissor/destinatário <strong className="text-red-600 dark:text-red-400">não corresponde</strong> ao CNPJ cadastrado na sua organização.
+                  </p>
+                  <p className="text-muted-foreground text-sm">
+                    Se este documento não pertence à sua empresa, as transações extraídas podem gerar dados incorretos nos seus relatórios financeiros.
+                  </p>
+                </div>
+                <div className="flex items-center justify-end gap-3 px-6 py-4 bg-muted/30 border-t border-border">
+                  <Button
+                    variant="outline"
+                    onClick={() => setCnpjConfirmDocId(null)}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      const docId = cnpjConfirmDocId;
+                      setCnpjConfirmDocId(null);
+                      confirmAll(docId);
+                    }}
+                    className="bg-red-600 hover:bg-red-700 text-white"
+                  >
+                    <AlertTriangle className="w-4 h-4 mr-2" />
+                    Sim, aprovar mesmo assim
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
