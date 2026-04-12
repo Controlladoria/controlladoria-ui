@@ -438,159 +438,120 @@ export default function DocumentViewerModal({ isOpen, onClose, document, onUpdat
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
-          {/* Summary Section */}
-          <div className="mb-6">
-            <button
-              onClick={() => toggleSection("summary")}
-              className="flex items-center justify-between w-full p-4 bg-accent/50 rounded-xl hover:bg-accent transition-colors mb-3"
-            >
-              <h3 className="text-xl font-bold text-foreground">📋 Resumo do Documento</h3>
-              {expandedSections.has("summary") ? (
-                <ChevronUp className="w-6 h-6 text-muted-foreground" />
-              ) : (
-                <ChevronDown className="w-6 h-6 text-muted-foreground" />
-              )}
-            </button>
-
-            {expandedSections.has("summary") && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {(data.document_number || isEditing) && (
-                  <div className="bg-card border-2 border-border rounded-xl p-4">
-                    <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                      <Hash className="w-5 h-5" />
-                      <span className="text-sm font-medium">Número</span>
-                    </div>
-                    {isEditing ? (
-                      <input
-                        type="text"
-                        value={data.document_number || ""}
-                        onChange={(e) => updateField("document_number", e.target.value)}
-                        className="w-full text-lg font-bold text-foreground bg-background border-2 border-input rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
-                      />
-                    ) : (
-                      <p className="text-lg font-bold text-foreground">{data.document_number}</p>
-                    )}
-                  </div>
-                )}
-
-                {(data.issue_date || isEditing) && (
-                  <div className="bg-card border-2 border-border rounded-xl p-4">
-                    <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                      <Calendar className="w-5 h-5" />
-                      <span className="text-sm font-medium">Data de Emissão</span>
-                    </div>
-                    {isEditing ? (
-                      <input
-                        type="date"
-                        value={data.issue_date || ""}
-                        onChange={(e) => updateField("issue_date", e.target.value)}
-                        className="w-full text-lg font-bold text-foreground bg-background border-2 border-input rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
-                      />
-                    ) : (
-                      <p className="text-lg font-bold text-foreground">{formatDate(data.issue_date)}</p>
-                    )}
-                  </div>
-                )}
-
-                {(data.total_amount !== undefined || isEditing) && (
-                  <div className="bg-green-500/10 dark:bg-green-500/20 border-2 border-green-500/20 rounded-xl p-4">
-                    <div className="flex items-center gap-2 text-green-700 dark:text-green-400 mb-2">
-                      <DollarSign className="w-5 h-5" />
-                      <span className="text-sm font-medium">Valor Total</span>
-                    </div>
-                    {isEditing ? (
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={data.total_amount || 0}
-                        onChange={(e) => updateField("total_amount", parseFloat(e.target.value) || 0)}
-                        className="w-full text-2xl font-bold text-foreground bg-background border-2 border-input rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500"
-                      />
-                    ) : (
-                      <p className="text-2xl font-bold text-green-900 dark:text-green-300">{formatCurrency(data.total_amount)}</p>
-                    )}
-                  </div>
-                )}
-
-                {(data.category || isEditing) && (
-                  <div className="bg-card border-2 border-border rounded-xl p-4">
-                    <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                      <Tag className="w-5 h-5" />
-                      <span className="text-sm font-medium">Categoria</span>
-                    </div>
-                    {isEditing ? (
-                      <input
-                        type="text"
-                        value={data.category || ""}
-                        onChange={(e) => updateField("category", e.target.value)}
-                        className="w-full text-lg font-bold text-foreground bg-background border-2 border-input rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
-                      />
-                    ) : (
-                      <p className="text-lg font-bold text-foreground">{formatCategory(data.category)}</p>
-                    )}
-                  </div>
-                )}
-
-                {isLedger && (
-                  <>
-                    <div className="bg-green-500/10 dark:bg-green-500/20 border-2 border-green-500/20 rounded-xl p-4">
-                      <div className="flex items-center gap-2 text-green-700 dark:text-green-400 mb-2">
-                        <DollarSign className="w-5 h-5" />
-                        <span className="text-sm font-medium">Total Receitas</span>
-                      </div>
-                      <p className="text-xl font-bold text-green-900 dark:text-green-300">{formatCurrency(data.total_income)}</p>
-                    </div>
-
-                    <div className="bg-red-500/10 dark:bg-red-500/20 border-2 border-red-500/20 rounded-xl p-4">
-                      <div className="flex items-center gap-2 text-red-700 dark:text-red-400 mb-2">
-                        <DollarSign className="w-5 h-5" />
-                        <span className="text-sm font-medium">Total Despesas</span>
-                      </div>
-                      <p className="text-xl font-bold text-red-900 dark:text-red-300">{formatCurrency(data.total_expense)}</p>
-                    </div>
-
-                    <div className="bg-blue-500/10 dark:bg-blue-500/20 border-2 border-blue-500/20 rounded-xl p-4">
-                      <div className="flex items-center gap-2 text-blue-700 dark:text-blue-400 mb-2">
-                        <DollarSign className="w-5 h-5" />
-                        <span className="text-sm font-medium">Saldo Líquido</span>
-                      </div>
-                      <p className="text-xl font-bold text-blue-900 dark:text-blue-300">{formatCurrency(data.net_balance)}</p>
-                    </div>
-
-                    <div className="bg-purple-500/10 dark:bg-purple-500/20 border-2 border-purple-500/20 rounded-xl p-4">
-                      <div className="flex items-center gap-2 text-purple-700 dark:text-purple-400 mb-2">
-                        <FileText className="w-5 h-5" />
-                        <span className="text-sm font-medium">Total Transações</span>
-                      </div>
-                      <p className="text-xl font-bold text-purple-900 dark:text-purple-300">{editedData?.transactions?.length ?? data.total_transactions ?? 0}</p>
-                    </div>
-                  </>
-                )}
-
-                {data.issuer && (
-                  <div className="bg-card border-2 border-border rounded-xl p-4 md:col-span-2">
-                    <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                      <Building2 className="w-5 h-5" />
-                      <span className="text-sm font-medium">Emissor</span>
-                    </div>
-                    <p className="text-base font-bold text-foreground">{data.issuer.name || data.issuer.legal_name}</p>
-                    {data.issuer.tax_id && <p className="text-sm text-muted-foreground">CNPJ/CPF: {data.issuer.tax_id}</p>}
-                  </div>
-                )}
-
-                {data.recipient && (
-                  <div className="bg-card border-2 border-border rounded-xl p-4 md:col-span-2">
-                    <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                      <Building2 className="w-5 h-5" />
-                      <span className="text-sm font-medium">Destinatário</span>
-                    </div>
-                    <p className="text-base font-bold text-foreground">{data.recipient.name || data.recipient.legal_name}</p>
-                    {data.recipient.tax_id && <p className="text-sm text-muted-foreground">CNPJ/CPF: {data.recipient.tax_id}</p>}
-                  </div>
+          {/* Summary — primary one-liner */}
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3 bg-accent/50 rounded-xl mb-3">
+            {(data.category || isEditing) && (
+              <div className="flex items-center gap-1.5">
+                <Tag className="w-4 h-4 text-muted-foreground shrink-0" />
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={data.category || ""}
+                    onChange={(e) => updateField("category", e.target.value)}
+                    className="text-sm font-semibold text-foreground bg-background border border-input rounded px-2 py-0.5 focus:ring-2 focus:ring-blue-500"
+                  />
+                ) : (
+                  <span className="text-sm font-semibold text-foreground">{formatCategory(data.category)}</span>
                 )}
               </div>
             )}
+            {isLedger ? (
+              <>
+                <div className="flex items-center gap-1.5">
+                  <DollarSign className="w-4 h-4 text-green-500 shrink-0" />
+                  <span className="text-xs text-muted-foreground">Receitas</span>
+                  <span className="text-sm font-bold text-green-600 dark:text-green-400">{formatCurrency(data.total_income)}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <DollarSign className="w-4 h-4 text-red-500 shrink-0" />
+                  <span className="text-xs text-muted-foreground">Despesas</span>
+                  <span className="text-sm font-bold text-red-600 dark:text-red-400">{formatCurrency(data.total_expense)}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <FileText className="w-4 h-4 text-purple-500 shrink-0" />
+                  <span className="text-xs text-muted-foreground">Transações</span>
+                  <span className="text-sm font-bold text-purple-600 dark:text-purple-400">{editedData?.transactions?.length ?? data.total_transactions ?? 0}</span>
+                </div>
+              </>
+            )}
           </div>
+
+          {/* Summary — secondary details (collapsible) */}
+          {(data.document_number || data.issue_date || data.issuer || data.recipient || isEditing) && (
+            <div className="mb-6">
+              <button
+                onClick={() => toggleSection("summary")}
+                className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors mb-2 px-1"
+              >
+                {expandedSections.has("summary") ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                {expandedSections.has("summary") ? "Ocultar detalhes" : "Ver mais detalhes"}
+              </button>
+
+              {expandedSections.has("summary") && (
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {(data.document_number || isEditing) && (
+                    <div className="bg-card border border-border rounded-lg p-3">
+                      <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
+                        <Hash className="w-3.5 h-3.5" />
+                        <span className="text-xs font-medium">Número</span>
+                      </div>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={data.document_number || ""}
+                          onChange={(e) => updateField("document_number", e.target.value)}
+                          className="w-full text-sm font-bold text-foreground bg-background border border-input rounded px-2 py-1 focus:ring-2 focus:ring-blue-500"
+                        />
+                      ) : (
+                        <p className="text-sm font-bold text-foreground truncate">{data.document_number}</p>
+                      )}
+                    </div>
+                  )}
+
+                  {(data.issue_date || isEditing) && (
+                    <div className="bg-card border border-border rounded-lg p-3">
+                      <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
+                        <Calendar className="w-3.5 h-3.5" />
+                        <span className="text-xs font-medium">Data de Emissão</span>
+                      </div>
+                      {isEditing ? (
+                        <input
+                          type="date"
+                          value={data.issue_date || ""}
+                          onChange={(e) => updateField("issue_date", e.target.value)}
+                          className="w-full text-sm font-bold text-foreground bg-background border border-input rounded px-2 py-1 focus:ring-2 focus:ring-blue-500"
+                        />
+                      ) : (
+                        <p className="text-sm font-bold text-foreground">{formatDate(data.issue_date)}</p>
+                      )}
+                    </div>
+                  )}
+
+                  {data.issuer && (
+                    <div className="bg-card border border-border rounded-lg p-3 col-span-2">
+                      <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
+                        <Building2 className="w-3.5 h-3.5" />
+                        <span className="text-xs font-medium">Emissor</span>
+                      </div>
+                      <p className="text-sm font-bold text-foreground truncate">{data.issuer.name || data.issuer.legal_name}</p>
+                      {data.issuer.tax_id && <p className="text-xs text-muted-foreground">CNPJ/CPF: {data.issuer.tax_id}</p>}
+                    </div>
+                  )}
+
+                  {data.recipient && (
+                    <div className="bg-card border border-border rounded-lg p-3 col-span-2">
+                      <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
+                        <Building2 className="w-3.5 h-3.5" />
+                        <span className="text-xs font-medium">Destinatário</span>
+                      </div>
+                      <p className="text-sm font-bold text-foreground truncate">{data.recipient.name || data.recipient.legal_name}</p>
+                      {data.recipient.tax_id && <p className="text-xs text-muted-foreground">CNPJ/CPF: {data.recipient.tax_id}</p>}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Transactions Section (for ledgers) */}
           {isLedger && data.transactions && data.transactions.length > 0 && (
