@@ -455,7 +455,7 @@ export default function DocumentViewerModal({ isOpen, onClose, document, onUpdat
                 )}
               </div>
             )}
-            {isLedger ? (
+            {isLedger && (
               <>
                 <div className="flex items-center gap-1.5">
                   <DollarSign className="w-4 h-4 text-green-500 shrink-0" />
