@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -282,6 +282,7 @@ export default function AdvancedReports() {
   const [cashFlowData, setCashFlowData] = useState<CashFlowData | null>(null);
   const [cashFlowInlineLoading, setCashFlowInlineLoading] = useState(false);
   const [cashFlowDetailedData, setCashFlowDetailedData] = useState<CashFlowDetailedData | null>(null);
+  const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
 
   // Track if auto-load has run
   const autoLoaded = useRef(false);
@@ -1041,239 +1042,139 @@ export default function AdvancedReports() {
                   </Button>
               </div>
 
-              {/* Inline Balance Sheet — Side-by-side template layout */}
+              {/* Inline Balance Sheet — Template layout */}
               {balanceData && (() => {
                 const hasPrev = !!balancePrevData;
-                const currLabel = new Date(balanceData.reference_date + 'T12:00:00').toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' });
-                const prevLabel = hasPrev ? new Date(balancePrevData!.reference_date + 'T12:00:00').toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }) : '';
-                // Build lookup for prev detailed lines by code
+                const currYear = new Date(balanceData.reference_date + 'T12:00:00').getFullYear();
+                const prevYear = hasPrev ? new Date(balancePrevData!.reference_date + 'T12:00:00').getFullYear() : currYear - 1;
+                // Lookup helpers for detailed_lines
+                const lineByCode: Record<string, number> = {};
+                if (balanceData.detailed_lines) {
+                  for (const l of balanceData.detailed_lines) lineByCode[l.code] = l.amount;
+                }
                 const prevLineByCode: Record<string, number> = {};
                 if (hasPrev && balancePrevData!.detailed_lines) {
-                  for (const l of balancePrevData!.detailed_lines) {
-                    prevLineByCode[l.code] = l.amount;
-                  }
+                  for (const l of balancePrevData!.detailed_lines) prevLineByCode[l.code] = l.amount;
                 }
-                const prevCell = (amount: number | undefined, isHeader?: boolean) => {
-                  if (!hasPrev) return null;
-                  const val = amount ?? 0;
-                  return (
-                    <td className={`px-4 ${isHeader ? 'py-2' : 'py-1.5'} text-right tabular-nums border-l border-border/30 ${isHeader ? 'font-bold' : ''} ${val < 0 ? "text-red-600/70 dark:text-red-400/70" : "text-muted-foreground"}`}>
-                      {formatBRL(val)}
-                    </td>
-                  );
-                };
-                const prevLineAmount = (code: string) => prevLineByCode[code];
+                const val = (code: string) => lineByCode[code] ?? 0;
+                const pval = (code: string) => prevLineByCode[code] ?? 0;
+                const bd = balanceData;
+                const pd = balancePrevData;
+
+                // Template row helpers
+                const sectionHeader = (label: string) => (
+                  <tr className="bg-green-800 text-white">
+                    <td className="px-4 py-2 font-bold text-sm">{label}</td>
+                    <td className="px-4 py-2 text-right tabular-nums font-bold" />
+                    {hasPrev && <td className="px-4 py-2 text-right tabular-nums font-bold border-l border-white/20" />}
+                  </tr>
+                );
+                const subtotalRow = (label: string, curr: number, prev?: number) => (
+                  <tr className="bg-green-800 text-white">
+                    <td className="px-4 py-2 font-bold text-sm">{label}</td>
+                    <td className="px-4 py-2 text-right tabular-nums font-bold">{formatBRL(curr)}</td>
+                    {hasPrev && <td className="px-4 py-2 text-right tabular-nums font-bold border-l border-white/20">{formatBRL(prev ?? 0)}</td>}
+                  </tr>
+                );
+                const lineRow = (label: string, curr: number, prev?: number, indent = true) => (
+                  <tr className="border-b border-border/50 hover:bg-accent/30">
+                    <td className="px-4 py-1.5 text-foreground" style={indent ? { paddingLeft: '28px' } : undefined}>{label}</td>
+                    <td className={`px-4 py-1.5 text-right tabular-nums ${curr < 0 ? "text-red-600 dark:text-red-400" : "text-foreground"}`}>{formatBRL(curr)}</td>
+                    {hasPrev && <td className={`px-4 py-1.5 text-right tabular-nums border-l border-border/30 ${(prev ?? 0) < 0 ? "text-red-600/70 dark:text-red-400/70" : "text-muted-foreground"}`}>{formatBRL(prev ?? 0)}</td>}
+                  </tr>
+                );
+                const totalRow = (label: string, curr: number, prev?: number) => (
+                  <tr className="bg-green-900 text-white font-bold">
+                    <td className="px-4 py-2.5">{label}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums">{formatBRL(curr)}</td>
+                    {hasPrev && <td className="px-4 py-2.5 text-right tabular-nums border-l border-white/20">{formatBRL(prev ?? 0)}</td>}
+                  </tr>
+                );
 
                 return (
                 <div className="border-t pt-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-foreground">
-                      Balanço Gerencial — {new Date(balanceData.reference_date + 'T00:00:00').toLocaleDateString('pt-BR')}
-                    </h3>
-                  </div>
+                  <h3 className="text-lg font-semibold text-foreground mb-4">
+                    Balanço Gerencial
+                  </h3>
 
-                  {/* Summary Cards */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                    <div className="p-4 bg-green-500/10 rounded-lg border border-green-200 dark:border-green-800">
-                      <p className="text-sm font-medium text-muted-foreground">Ativos</p>
-                      <p className="text-2xl font-bold text-green-700 dark:text-green-400">{formatBRL(balanceData.ativo?.total || 0)}</p>
-                      {hasPrev && <p className="text-xs text-muted-foreground mt-1">{prevLabel}: {formatBRL(balancePrevData!.ativo?.total || 0)}</p>}
-                    </div>
-                    <div className="p-4 bg-red-500/10 rounded-lg border border-red-200 dark:border-red-800">
-                      <p className="text-sm font-medium text-muted-foreground">Passivos</p>
-                      <p className="text-2xl font-bold text-red-700 dark:text-red-400">{formatBRL(balanceData.passivo?.total || 0)}</p>
-                      {hasPrev && <p className="text-xs text-muted-foreground mt-1">{prevLabel}: {formatBRL(balancePrevData!.passivo?.total || 0)}</p>}
-                    </div>
-                    <div className="p-4 bg-blue-500/10 rounded-lg border border-blue-200 dark:border-blue-800">
-                      <p className="text-sm font-medium text-muted-foreground">Patrimônio Líquido</p>
-                      <p className="text-2xl font-bold text-blue-700 dark:text-blue-400">{formatBRL(balanceData.patrimonio_liquido?.total || 0)}</p>
-                      {hasPrev && <p className="text-xs text-muted-foreground mt-1">{prevLabel}: {formatBRL(balancePrevData!.patrimonio_liquido?.total || 0)}</p>}
-                    </div>
-                  </div>
-
-                  {/* Two-column Balance Sheet */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    {/* ========== LEFT: ATIVO ========== */}
+                    {/* LEFT: ATIVO */}
                     <div className="overflow-x-auto rounded-lg border border-border">
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="bg-muted/50">
                             <th className="text-left px-4 py-3 font-bold text-foreground">ATIVO</th>
-                            <th className="text-right px-4 py-3 font-bold text-foreground w-32">{currLabel}</th>
-                            {hasPrev && <th className="text-right px-4 py-3 font-bold text-muted-foreground w-32 border-l border-border/30">{prevLabel}</th>}
+                            <th className="text-right px-4 py-3 font-bold text-foreground w-32">{currYear}</th>
+                            {hasPrev && <th className="text-right px-4 py-3 font-bold text-muted-foreground w-32 border-l border-border/30">{prevYear}</th>}
                           </tr>
                         </thead>
                         <tbody>
-                          {/* Ativo Circulante */}
-                          <tr className="bg-green-800 text-white">
-                            <td className="px-4 py-2 font-bold text-sm"><span className="inline-flex items-center gap-1.5">Ativo Circulante<BalanceInfoIcon label="Ativo Circulante" /></span></td>
-                            <td className="px-4 py-2 text-right tabular-nums font-bold">{formatBRL(balanceData.ativo?.circulante || 0)}</td>
-                            {hasPrev && <td className="px-4 py-2 text-right tabular-nums font-bold border-l border-white/20">{formatBRL(balancePrevData!.ativo?.circulante || 0)}</td>}
-                          </tr>
-                          {balanceData.detailed_lines?.filter(l => l.code.startsWith('1.01')).map((line, i) => (
-                            <tr key={`ac-${i}`} className="border-b border-border/50 hover:bg-accent/30">
-                              <td className="px-4 py-1.5 text-foreground" style={{ paddingLeft: '28px' }}><span className="inline-flex items-center gap-1.5">{line.description}<SaldoInicialHint description={line.description} /></span></td>
-                              <td className={`px-4 py-1.5 text-right tabular-nums ${line.amount < 0 ? "text-red-600 dark:text-red-400" : "text-foreground"}`}>
-                                {formatBRL(line.amount)}
-                              </td>
-                              {prevCell(prevLineAmount(line.code))}
-                            </tr>
-                          ))}
+                          {subtotalRow("Ativo Circulante", bd.ativo?.circulante || 0, pd?.ativo?.circulante)}
+                          {lineRow("Caixa e Equivalentes de Caixa", val("1.01.001"), pval("1.01.001"))}
+                          {lineRow("Aplicações Financeiras (curto prazo)", val("1.01.002"), pval("1.01.002"))}
+                          {lineRow("Clientes (Contas a Receber)", val("1.01.003"), pval("1.01.003"))}
+                          {lineRow("Estoques", val("1.01.004"), pval("1.01.004"))}
+                          {lineRow("Despesas Antecipadas e Outros", val("1.01.005"), pval("1.01.005"))}
 
-                          {/* Ativo Não Circulante */}
-                          <tr className="bg-green-800 text-white">
-                            <td className="px-4 py-2 font-bold text-sm"><span className="inline-flex items-center gap-1.5">Ativo Não Circulante<BalanceInfoIcon label="Ativo Não Circulante" /></span></td>
-                            <td className="px-4 py-2 text-right tabular-nums font-bold">{formatBRL(balanceData.ativo?.nao_circulante || 0)}</td>
-                            {hasPrev && <td className="px-4 py-2 text-right tabular-nums font-bold border-l border-white/20">{formatBRL(balancePrevData!.ativo?.nao_circulante || 0)}</td>}
-                          </tr>
-                          {balanceData.detailed_lines?.filter(l => l.code.startsWith('1.02.0') && !l.code.startsWith('1.02.02') && !l.code.startsWith('1.02.03')).map((line, i) => (
-                            <tr key={`anc-${i}`} className="border-b border-border/50 hover:bg-accent/30">
-                              <td className="px-4 py-1.5 text-foreground" style={{ paddingLeft: '28px' }}><span className="inline-flex items-center gap-1.5">{line.description}<SaldoInicialHint description={line.description} /></span></td>
-                              <td className={`px-4 py-1.5 text-right tabular-nums ${line.amount < 0 ? "text-red-600 dark:text-red-400" : "text-foreground"}`}>
-                                {formatBRL(line.amount)}
-                              </td>
-                              {prevCell(prevLineAmount(line.code))}
-                            </tr>
-                          ))}
+                          {subtotalRow("Ativo Não Circulante", bd.ativo?.nao_circulante || 0, pd?.ativo?.nao_circulante)}
+                          {lineRow("Créditos Diversos (LP)", val("1.02.001"), pval("1.02.001"))}
+                          {lineRow("Outros Créditos (LP)", val("1.02.002"), pval("1.02.002"))}
 
-                          {/* Imobilizado */}
-                          <tr className="bg-green-800 text-white">
-                            <td className="px-4 py-2 font-bold text-sm"><span className="inline-flex items-center gap-1.5">Imobilizado<BalanceInfoIcon label="Imobilizado" /></span></td>
-                            <td className="px-4 py-2 text-right tabular-nums font-bold">{formatBRL(balanceData.ativo?.imobilizado || 0)}</td>
-                            {hasPrev && <td className="px-4 py-2 text-right tabular-nums font-bold border-l border-white/20">{formatBRL(balancePrevData!.ativo?.imobilizado || 0)}</td>}
-                          </tr>
-                          {balanceData.detailed_lines?.filter(l => l.code.startsWith('1.02.02')).map((line, i) => (
-                            <tr key={`imob-${i}`} className="border-b border-border/50 hover:bg-accent/30">
-                              <td className="px-4 py-1.5 text-foreground" style={{ paddingLeft: '28px' }}><span className="inline-flex items-center gap-1.5">{line.description}<SaldoInicialHint description={line.description} /></span></td>
-                              <td className={`px-4 py-1.5 text-right tabular-nums ${line.amount < 0 ? "text-red-600 dark:text-red-400" : "text-foreground"}`}>
-                                {formatBRL(line.amount)}
-                              </td>
-                              {prevCell(prevLineAmount(line.code))}
-                            </tr>
-                          ))}
+                          {subtotalRow("Imobilizado", bd.ativo?.imobilizado || 0, pd?.ativo?.imobilizado)}
+                          {lineRow("Imobilizado (Custo)",
+                            // Sum all imobilizado sub-accounts except depreciation (099)
+                            ["1.02.02.001","1.02.02.002","1.02.02.003","1.02.02.004","1.02.02.005","1.02.02.006","1.02.02.007"].reduce((s, c) => s + val(c), 0),
+                            ["1.02.02.001","1.02.02.002","1.02.02.003","1.02.02.004","1.02.02.005","1.02.02.006","1.02.02.007"].reduce((s, c) => s + pval(c), 0)
+                          )}
+                          {lineRow("(-) Depreciação Acumulada", val("1.02.02.099"), pval("1.02.02.099"))}
 
-                          {/* Intangível */}
-                          <tr className="bg-green-800 text-white">
-                            <td className="px-4 py-2 font-bold text-sm"><span className="inline-flex items-center gap-1.5">Intangível<BalanceInfoIcon label="Intangível" /></span></td>
-                            <td className="px-4 py-2 text-right tabular-nums font-bold">{formatBRL(balanceData.ativo?.intangivel || 0)}</td>
-                            {hasPrev && <td className="px-4 py-2 text-right tabular-nums font-bold border-l border-white/20">{formatBRL(balancePrevData!.ativo?.intangivel || 0)}</td>}
-                          </tr>
-                          {balanceData.detailed_lines?.filter(l => l.code.startsWith('1.02.03')).map((line, i) => (
-                            <tr key={`intg-${i}`} className="border-b border-border/50 hover:bg-accent/30">
-                              <td className="px-4 py-1.5 text-foreground" style={{ paddingLeft: '28px' }}><span className="inline-flex items-center gap-1.5">{line.description}<SaldoInicialHint description={line.description} /></span></td>
-                              <td className={`px-4 py-1.5 text-right tabular-nums ${line.amount < 0 ? "text-red-600 dark:text-red-400" : "text-foreground"}`}>
-                                {formatBRL(line.amount)}
-                              </td>
-                              {prevCell(prevLineAmount(line.code))}
-                            </tr>
-                          ))}
+                          {subtotalRow("Intangível", bd.ativo?.intangivel || 0, pd?.ativo?.intangivel)}
+                          {lineRow("Intangível (Custo)", val("1.02.03.001"), pval("1.02.03.001"))}
+                          {lineRow("(-) Amortização Acumulada", val("1.02.03.099"), pval("1.02.03.099"))}
 
-                          {/* TOTAL ATIVO */}
-                          <tr className="bg-green-900 text-white font-bold">
-                            <td className="px-4 py-2.5"><span className="inline-flex items-center gap-1.5">TOTAL ATIVO<BalanceInfoIcon label="Total Ativo" /></span></td>
-                            <td className="px-4 py-2.5 text-right tabular-nums">{formatBRL(balanceData.ativo?.total || 0)}</td>
-                            {hasPrev && <td className="px-4 py-2.5 text-right tabular-nums border-l border-white/20">{formatBRL(balancePrevData!.ativo?.total || 0)}</td>}
-                          </tr>
+                          {totalRow("TOTAL ATIVO", bd.ativo?.total || 0, pd?.ativo?.total)}
                         </tbody>
                       </table>
                     </div>
 
-                    {/* ========== RIGHT: PASSIVO + PL ========== */}
+                    {/* RIGHT: PASSIVO + PL */}
                     <div className="overflow-x-auto rounded-lg border border-border">
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="bg-muted/50">
                             <th className="text-left px-4 py-3 font-bold text-foreground">PASSIVO + PL</th>
-                            <th className="text-right px-4 py-3 font-bold text-foreground w-32">{currLabel}</th>
-                            {hasPrev && <th className="text-right px-4 py-3 font-bold text-muted-foreground w-32 border-l border-border/30">{prevLabel}</th>}
+                            <th className="text-right px-4 py-3 font-bold text-foreground w-32">{currYear}</th>
+                            {hasPrev && <th className="text-right px-4 py-3 font-bold text-muted-foreground w-32 border-l border-border/30">{prevYear}</th>}
                           </tr>
                         </thead>
                         <tbody>
-                          {/* Passivo Circulante */}
-                          <tr className="bg-green-800 text-white">
-                            <td className="px-4 py-2 font-bold text-sm"><span className="inline-flex items-center gap-1.5">Passivo Circulante<BalanceInfoIcon label="Passivo Circulante" /></span></td>
-                            <td className="px-4 py-2 text-right tabular-nums font-bold">{formatBRL(balanceData.passivo?.circulante || 0)}</td>
-                            {hasPrev && <td className="px-4 py-2 text-right tabular-nums font-bold border-l border-white/20">{formatBRL(balancePrevData!.passivo?.circulante || 0)}</td>}
-                          </tr>
-                          {balanceData.detailed_lines?.filter(l => l.code.startsWith('2.01')).map((line, i) => (
-                            <tr key={`pc-${i}`} className="border-b border-border/50 hover:bg-accent/30">
-                              <td className="px-4 py-1.5 text-foreground" style={{ paddingLeft: '28px' }}><span className="inline-flex items-center gap-1.5">{line.description}<SaldoInicialHint description={line.description} /></span></td>
-                              <td className={`px-4 py-1.5 text-right tabular-nums ${line.amount < 0 ? "text-red-600 dark:text-red-400" : "text-foreground"}`}>
-                                {formatBRL(line.amount)}
-                              </td>
-                              {prevCell(prevLineAmount(line.code))}
-                            </tr>
-                          ))}
+                          {subtotalRow("Passivo Circulante", bd.passivo?.circulante || 0, pd?.passivo?.circulante)}
+                          {lineRow("Fornecedores", val("2.01.001"), pval("2.01.001"))}
+                          {lineRow("Empréstimos e Financiamentos (CP)", val("2.01.002"), pval("2.01.002"))}
+                          {lineRow("Obrigações Trabalhistas e Sociais", val("2.01.003"), pval("2.01.003"))}
+                          {lineRow("Obrigações Fiscais", val("2.01.004"), pval("2.01.004"))}
+                          {lineRow("Provisões e Outros", val("2.01.005"), pval("2.01.005"))}
 
-                          {/* Passivo Não Circulante */}
-                          <tr className="bg-green-800 text-white">
-                            <td className="px-4 py-2 font-bold text-sm"><span className="inline-flex items-center gap-1.5">Passivo Não Circulante<BalanceInfoIcon label="Passivo Não Circulante" /></span></td>
-                            <td className="px-4 py-2 text-right tabular-nums font-bold">{formatBRL(balanceData.passivo?.nao_circulante || 0)}</td>
-                            {hasPrev && <td className="px-4 py-2 text-right tabular-nums font-bold border-l border-white/20">{formatBRL(balancePrevData!.passivo?.nao_circulante || 0)}</td>}
-                          </tr>
-                          {balanceData.detailed_lines?.filter(l => l.code.startsWith('2.02')).map((line, i) => (
-                            <tr key={`pnc-${i}`} className="border-b border-border/50 hover:bg-accent/30">
-                              <td className="px-4 py-1.5 text-foreground" style={{ paddingLeft: '28px' }}><span className="inline-flex items-center gap-1.5">{line.description}<SaldoInicialHint description={line.description} /></span></td>
-                              <td className={`px-4 py-1.5 text-right tabular-nums ${line.amount < 0 ? "text-red-600 dark:text-red-400" : "text-foreground"}`}>
-                                {formatBRL(line.amount)}
-                              </td>
-                              {prevCell(prevLineAmount(line.code))}
-                            </tr>
-                          ))}
+                          {subtotalRow("Passivo Não Circulante", bd.passivo?.nao_circulante || 0, pd?.passivo?.nao_circulante)}
+                          {lineRow("Empréstimos e Financiamentos (LP)", val("2.02.001"), pval("2.02.001"))}
+                          {lineRow("Provisões (LP)", val("2.02.003"), pval("2.02.003"))}
+                          {lineRow("Passivos Fiscais Diferidos", val("2.02.004"), pval("2.02.004"))}
 
-                          {/* Patrimônio Líquido */}
-                          <tr className="bg-green-800 text-white">
-                            <td className="px-4 py-2 font-bold text-sm"><span className="inline-flex items-center gap-1.5">Patrimônio Líquido<BalanceInfoIcon label="Patrimônio Líquido" /></span></td>
-                            <td className={`px-4 py-2 text-right tabular-nums font-bold`}>
-                              {formatBRL(balanceData.patrimonio_liquido?.total || 0)}
-                            </td>
-                            {hasPrev && <td className="px-4 py-2 text-right tabular-nums font-bold border-l border-white/20">{formatBRL(balancePrevData!.patrimonio_liquido?.total || 0)}</td>}
-                          </tr>
-                          {/* Use detailed_lines when available, fallback to breakdown fields */}
-                          {(balanceData.detailed_lines?.filter(l => l.code.startsWith('3.')).length ?? 0) > 0
-                            ? balanceData.detailed_lines?.filter(l => l.code.startsWith('3.')).map((line, i) => (
-                                <tr key={`pl-${i}`} className="border-b border-border/50 hover:bg-accent/30">
-                                  <td className="px-4 py-1.5 text-foreground" style={{ paddingLeft: '28px' }}><span className="inline-flex items-center gap-1.5">{line.description}<SaldoInicialHint description={line.description} /></span></td>
-                                  <td className={`px-4 py-1.5 text-right tabular-nums ${line.amount < 0 ? "text-red-600 dark:text-red-400" : "text-foreground"}`}>
-                                    {formatBRL(line.amount)}
-                                  </td>
-                                  {prevCell(prevLineAmount(line.code))}
-                                </tr>
-                              ))
-                            : [
-                                { label: 'Capital Social', value: balanceData.patrimonio_liquido?.capital_social ?? 0, prevValue: hasPrev ? (balancePrevData!.patrimonio_liquido?.capital_social ?? 0) : 0 },
-                                { label: 'Reservas e Ajustes', value: balanceData.patrimonio_liquido?.reservas ?? 0, prevValue: hasPrev ? (balancePrevData!.patrimonio_liquido?.reservas ?? 0) : 0 },
-                                { label: 'Lucro ou prejuízo do exercício', value: balanceData.patrimonio_liquido?.lucros_acumulados ?? 0, prevValue: hasPrev ? (balancePrevData!.patrimonio_liquido?.lucros_acumulados ?? 0) : 0 },
-                              ].filter(item => item.value !== 0 || item.prevValue !== 0).map((item, i) => (
-                                <tr key={`plf-${i}`} className="border-b border-border/50 hover:bg-accent/30">
-                                  <td className="px-4 py-1.5 text-foreground" style={{ paddingLeft: '28px' }}>{item.label}</td>
-                                  <td className={`px-4 py-1.5 text-right tabular-nums ${item.value < 0 ? "text-red-600 dark:text-red-400" : "text-foreground"}`}>
-                                    {formatBRL(item.value)}
-                                  </td>
-                                  {prevCell(item.prevValue)}
-                                </tr>
-                              ))
-                          }
+                          {subtotalRow("Patrimônio Líquido", bd.patrimonio_liquido?.total || 0, pd?.patrimonio_liquido?.total)}
+                          {lineRow("Capital Social", val("3.01.001") || (bd.patrimonio_liquido?.capital_social ?? 0), pval("3.01.001") || (pd?.patrimonio_liquido?.capital_social ?? 0))}
+                          {lineRow("Reservas e Ajustes", val("3.02.001") || (bd.patrimonio_liquido?.reservas ?? 0), pval("3.02.001") || (pd?.patrimonio_liquido?.reservas ?? 0))}
+                          {lineRow("Lucros/Prejuízos Acumulados", val("3.04.001") || (bd.patrimonio_liquido?.lucros_acumulados ?? 0), pval("3.04.001") || (pd?.patrimonio_liquido?.lucros_acumulados ?? 0))}
 
-                          {/* TOTAL PASSIVO + PL */}
-                          <tr className="bg-green-900 text-white font-bold">
-                            <td className="px-4 py-2.5"><span className="inline-flex items-center gap-1.5">TOTAL PASSIVO + PL<BalanceInfoIcon label="Total Passivo + PL" /></span></td>
-                            <td className="px-4 py-2.5 text-right tabular-nums">
-                              {formatBRL((balanceData.passivo?.total || 0) + (balanceData.patrimonio_liquido?.total || 0))}
-                            </td>
-                            {hasPrev && <td className="px-4 py-2.5 text-right tabular-nums border-l border-white/20">
-                              {formatBRL((balancePrevData!.passivo?.total || 0) + (balancePrevData!.patrimonio_liquido?.total || 0))}
-                            </td>}
-                          </tr>
+                          {totalRow("TOTAL PASSIVO + PL", (bd.passivo?.total || 0) + (bd.patrimonio_liquido?.total || 0), pd ? (pd.passivo?.total || 0) + (pd.patrimonio_liquido?.total || 0) : undefined)}
                         </tbody>
                       </table>
                     </div>
                   </div>
 
                   {/* Balance Check */}
-                  <div className={`mt-4 p-3 rounded-lg text-sm font-semibold flex items-center justify-between ${balanceData.is_balanced ? 'bg-green-500/10 text-green-700 dark:text-green-400' : 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400'}`}>
-                    <span>{balanceData.is_balanced ? '✅ Balanço equilibrado' : '⚠️ Diferença no balanço'}</span>
-                    {!balanceData.is_balanced && <span className="tabular-nums">{formatBRL(balanceData.balance_difference || 0)}</span>}
+                  <div className={`mt-4 p-3 rounded-lg text-sm font-semibold flex items-center justify-between ${bd.is_balanced ? 'bg-green-500/10 text-green-700 dark:text-green-400' : 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400'}`}>
+                    <span>{bd.is_balanced ? '✅ Balanço equilibrado' : '⚠️ Diferença no balanço'}</span>
+                    {!bd.is_balanced && <span className="tabular-nums">{formatBRL(bd.balance_difference || 0)}</span>}
                   </div>
                 </div>
                 );
@@ -1381,8 +1282,23 @@ export default function AdvancedReports() {
                      'Detalhamento Diário'}
                   </h3>
 
-                  {/* Year view: monthly totals — Entradas / Saídas / Saldo */}
-                  {periodType === 'year' && cashFlowDetailedData.daily_dre.length > 0 && (
+                  {/* Year view: monthly rows, click to expand daily detail */}
+                  {periodType === 'year' && cashFlowDetailedData.daily_dre.length > 0 && (() => {
+                    // Group daily entries by month
+                    const dailyByMonth: Record<string, typeof cashFlowDetailedData.daily_dre> = {};
+                    for (const entry of cashFlowDetailedData.daily_dre) {
+                      const mk = entry.day.slice(0, 7);
+                      if (!dailyByMonth[mk]) dailyByMonth[mk] = [];
+                      dailyByMonth[mk].push(entry);
+                    }
+                    const toggleMonth = (mk: string) => {
+                      setExpandedMonths(prev => {
+                        const next = new Set(prev);
+                        next.has(mk) ? next.delete(mk) : next.add(mk);
+                        return next;
+                      });
+                    };
+                    return (
                     <div className="overflow-x-auto rounded-lg border border-border">
                       <table className="w-full text-sm">
                         <thead>
@@ -1390,8 +1306,8 @@ export default function AdvancedReports() {
                             <th className="text-left px-4 py-3 font-semibold text-foreground">Mês</th>
                             <th className="text-right px-3 py-3 font-semibold text-green-700 dark:text-green-400">Entradas</th>
                             <th className="text-right px-3 py-3 font-semibold text-red-700 dark:text-red-400">Saídas</th>
-                            <th className="text-right px-3 py-3 font-semibold text-foreground">Saldo do Mês</th>
-                            <th className="text-right px-3 py-3 font-semibold text-blue-700 dark:text-blue-400">Saldo Acumulado</th>
+                            <th className="text-right px-3 py-3 font-semibold text-foreground">Saldo</th>
+                            <th className="text-right px-3 py-3 font-semibold text-blue-700 dark:text-blue-400">Acumulado</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
@@ -1401,24 +1317,60 @@ export default function AdvancedReports() {
                               const entradas = data.receita_bruta || 0;
                               const saidas = (data.receita_bruta || 0) - (data.resultado_liquido || 0);
                               const saldo = data.resultado_liquido || 0;
+                              const isExpanded = expandedMonths.has(monthKey);
+                              const monthDays = dailyByMonth[monthKey] || [];
                               return (
-                                <tr key={monthKey} className="hover:bg-accent/30">
-                                  <td className="px-4 py-2 font-medium text-foreground">
-                                    {format(new Date(monthKey + '-01T12:00:00'), 'MMMM/yyyy', { locale: ptBR })}
-                                  </td>
-                                  <td className="px-3 py-2 text-right tabular-nums text-green-600 dark:text-green-400">{formatBRL(entradas)}</td>
-                                  <td className="px-3 py-2 text-right tabular-nums text-red-600 dark:text-red-400">{formatBRL(-saidas)}</td>
-                                  <td className={`px-3 py-2 text-right tabular-nums font-semibold ${saldo < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
-                                    {formatBRL(saldo)}
-                                  </td>
-                                  <td className="px-3 py-2 text-right tabular-nums font-bold text-blue-600 dark:text-blue-400">—</td>
-                                </tr>
+                                <React.Fragment key={monthKey}>
+                                  <tr
+                                    className="hover:bg-accent/30 cursor-pointer select-none"
+                                    onClick={() => toggleMonth(monthKey)}
+                                  >
+                                    <td className="px-4 py-2.5 font-semibold text-foreground">
+                                      <span className="inline-flex items-center gap-2">
+                                        <span className={`text-xs transition-transform ${isExpanded ? 'rotate-90' : ''}`}>&#9654;</span>
+                                        {format(new Date(monthKey + '-01T12:00:00'), 'MMMM/yyyy', { locale: ptBR })}
+                                        <span className="text-xs text-muted-foreground font-normal">({monthDays.length} dias)</span>
+                                      </span>
+                                    </td>
+                                    <td className="px-3 py-2.5 text-right tabular-nums text-green-600 dark:text-green-400">{formatBRL(entradas)}</td>
+                                    <td className="px-3 py-2.5 text-right tabular-nums text-red-600 dark:text-red-400">{formatBRL(-saidas)}</td>
+                                    <td className={`px-3 py-2.5 text-right tabular-nums font-semibold ${saldo < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                                      {formatBRL(saldo)}
+                                    </td>
+                                    <td className="px-3 py-2.5 text-right tabular-nums font-bold text-blue-600 dark:text-blue-400">—</td>
+                                  </tr>
+                                  {isExpanded && monthDays.map((entry, di) => {
+                                    const dayEntradas = entry.receita_bruta + entry.receitas_nao_operacionais;
+                                    const daySaidas = entry.total_deducoes + entry.total_custos_variaveis + entry.total_custos_fixos + entry.despesas_nao_operacionais;
+                                    const hasData = dayEntradas !== 0 || daySaidas !== 0;
+                                    return (
+                                      <tr key={`${monthKey}-${di}`} className={`bg-muted/20 ${hasData ? 'hover:bg-accent/20' : 'opacity-30'}`}>
+                                        <td className="px-4 py-1 text-foreground pl-10 text-xs">
+                                          {format(new Date(entry.day + 'T12:00:00'), 'dd/MM (EEE)', { locale: ptBR })}
+                                        </td>
+                                        <td className="px-3 py-1 text-right tabular-nums text-xs text-green-600 dark:text-green-400">
+                                          {dayEntradas ? formatBRL(dayEntradas) : '-'}
+                                        </td>
+                                        <td className="px-3 py-1 text-right tabular-nums text-xs text-red-600 dark:text-red-400">
+                                          {daySaidas ? formatBRL(-daySaidas) : '-'}
+                                        </td>
+                                        <td className={`px-3 py-1 text-right tabular-nums text-xs ${entry.resultado_liquido < 0 ? 'text-red-600 dark:text-red-400' : entry.resultado_liquido > 0 ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
+                                          {entry.resultado_liquido ? formatBRL(entry.resultado_liquido) : '-'}
+                                        </td>
+                                        <td className={`px-3 py-1 text-right tabular-nums text-xs font-medium ${entry.resultado_acumulado < 0 ? 'text-red-600 dark:text-red-400' : 'text-blue-600 dark:text-blue-400'}`}>
+                                          {formatBRL(entry.resultado_acumulado)}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </React.Fragment>
                               );
                             })}
                         </tbody>
                       </table>
                     </div>
-                  )}
+                    );
+                  })()}
 
                   {/* Day view: transaction list */}
                   {periodType === 'day' && cashFlowDetailedData.transactions && (
