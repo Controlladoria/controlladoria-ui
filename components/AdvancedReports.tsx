@@ -1354,59 +1354,52 @@ export default function AdvancedReports() {
                 <div className="border-t pt-6">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-semibold text-foreground">
-                      Fluxo de Caixa ({cashFlowData.method === 'indirect' ? 'Método Indireto' : 'Método Direto'}) — {new Date(cashFlowData.start_date + 'T00:00:00').toLocaleDateString('pt-BR')} a {new Date(cashFlowData.end_date + 'T00:00:00').toLocaleDateString('pt-BR')}
+                      Fluxo de Caixa — {new Date(cashFlowData.start_date + 'T12:00:00').toLocaleDateString('pt-BR')} a {new Date(cashFlowData.end_date + 'T12:00:00').toLocaleDateString('pt-BR')}
                     </h3>
                     {cashFlowData.company_name && (
                       <span className="text-sm text-muted-foreground">{cashFlowData.company_name}</span>
                     )}
                   </div>
 
-                  {/* Cash Position Cards */}
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                    <div className="p-4 bg-muted/30 rounded-lg border border-border">
-                      <p className="text-sm font-medium text-muted-foreground">Saldo Inicial</p>
-                      <p className="text-xl font-bold text-foreground">{formatBRL(cashFlowData.cash_beginning)}</p>
-                    </div>
-                    <div className={`p-4 rounded-lg border ${cashFlowData.net_increase_in_cash >= 0 ? 'bg-green-500/10 border-green-200 dark:border-green-800' : 'bg-red-500/10 border-red-200 dark:border-red-800'}`}>
-                      <p className="text-sm font-medium text-muted-foreground">Variação no Período</p>
-                      <p className={`text-xl font-bold ${cashFlowData.net_increase_in_cash >= 0 ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>
-                        {cashFlowData.net_increase_in_cash >= 0 ? '+' : ''}{formatBRL(cashFlowData.net_increase_in_cash)}
-                      </p>
-                    </div>
-                    <div className="p-4 bg-blue-500/10 rounded-lg border border-blue-200 dark:border-blue-800">
-                      <p className="text-sm font-medium text-muted-foreground">Saldo Final</p>
-                      <p className="text-xl font-bold text-blue-700 dark:text-blue-400">{formatBRL(cashFlowData.cash_ending)}</p>
-                    </div>
-                    <div className={`p-4 rounded-lg border ${cashFlowData.net_cash_from_operations >= 0 ? 'bg-green-500/10 border-green-200 dark:border-green-800' : 'bg-amber-500/10 border-amber-200 dark:border-amber-800'}`}>
-                      <p className="text-sm font-medium text-muted-foreground">Caixa Operacional</p>
-                      <p className={`text-xl font-bold ${cashFlowData.net_cash_from_operations >= 0 ? 'text-green-700 dark:text-green-400' : 'text-amber-700 dark:text-amber-400'}`}>
-                        {formatBRL(cashFlowData.net_cash_from_operations)}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Sections */}
-                  {renderCashFlowSection(cashFlowData.operating_activities, "text-green-700 dark:text-green-400")}
-                  {renderCashFlowSection(cashFlowData.investing_activities, "text-blue-700 dark:text-blue-400")}
-                  {renderCashFlowSection(cashFlowData.financing_activities, "text-purple-700 dark:text-purple-400")}
-
-                  {/* Grand Total */}
-                  <div className="overflow-x-auto rounded-lg border-2 border-foreground/20">
+                  {/* Summary: Saldo Inicial → Entradas → Saídas → Saldo Final */}
+                  <div className="overflow-x-auto rounded-lg border-2 border-foreground/20 mb-6">
                     <table className="w-full text-sm">
                       <tbody>
-                        <tr className="bg-blue-500/10 font-bold">
-                          <td className="px-4 py-3 text-foreground">Variação Líquida de Caixa</td>
-                          <td className={`px-4 py-3 text-right tabular-nums w-40 ${cashFlowData.net_increase_in_cash < 0 ? "text-red-600 dark:text-red-400" : "text-foreground"}`}>
-                            {formatBRL(cashFlowData.net_increase_in_cash)}
+                        <tr className="bg-muted/50 font-bold">
+                          <td className="px-4 py-3 text-foreground">SALDO INICIAL</td>
+                          <td className="px-4 py-3 text-right tabular-nums w-44 text-foreground">{formatBRL(cashFlowData.cash_beginning)}</td>
+                        </tr>
+                        <tr className="bg-green-500/10">
+                          <td className="px-4 py-3 text-green-700 dark:text-green-400 font-bold">ENTRADAS</td>
+                          <td className="px-4 py-3 text-right tabular-nums w-44 text-green-700 dark:text-green-400 font-bold">
+                            {formatBRL(cashFlowData.net_cash_from_operations)}
                           </td>
                         </tr>
-                        <tr className="bg-muted/30">
-                          <td className="px-4 py-2 text-muted-foreground">Saldo Inicial de Caixa</td>
-                          <td className="px-4 py-2 text-right tabular-nums w-40 text-foreground">{formatBRL(cashFlowData.cash_beginning)}</td>
+                        {/* Entradas detail */}
+                        {Object.entries(cashFlowData.operating_activities.line_items).map(([label, value], i) => (
+                          <tr key={`in-${i}`} className="hover:bg-accent/30">
+                            <td className="px-4 py-1.5 text-foreground pl-8 text-sm">(+) {label}</td>
+                            <td className="px-4 py-1.5 text-right tabular-nums w-44 text-sm">{formatBRL(value)}</td>
+                          </tr>
+                        ))}
+                        <tr className="bg-red-500/10">
+                          <td className="px-4 py-3 text-red-700 dark:text-red-400 font-bold">SAÍDAS</td>
+                          <td className="px-4 py-3 text-right tabular-nums w-44 text-red-700 dark:text-red-400 font-bold">
+                            {formatBRL(cashFlowData.net_cash_from_investments)}
+                          </td>
                         </tr>
-                        <tr className="bg-blue-500/10 font-bold">
-                          <td className="px-4 py-3 text-foreground">Saldo Final de Caixa</td>
-                          <td className="px-4 py-3 text-right tabular-nums w-40 text-blue-700 dark:text-blue-400">{formatBRL(cashFlowData.cash_ending)}</td>
+                        {/* Saídas detail */}
+                        {Object.entries(cashFlowData.investing_activities.line_items).map(([label, value], i) => (
+                          <tr key={`out-${i}`} className="hover:bg-accent/30">
+                            <td className="px-4 py-1.5 text-foreground pl-8 text-sm">(-) {label}</td>
+                            <td className="px-4 py-1.5 text-right tabular-nums w-44 text-sm text-red-600 dark:text-red-400">{formatBRL(value)}</td>
+                          </tr>
+                        ))}
+                        <tr className={`font-bold ${cashFlowData.net_increase_in_cash >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'}`}>
+                          <td className="px-4 py-3 text-foreground">SALDO FINAL</td>
+                          <td className={`px-4 py-3 text-right tabular-nums w-44 font-bold ${cashFlowData.cash_ending >= 0 ? 'text-blue-700 dark:text-blue-400' : 'text-red-700 dark:text-red-400'}`}>
+                            {formatBRL(cashFlowData.cash_ending)}
+                          </td>
                         </tr>
                       </tbody>
                     </table>
@@ -1414,7 +1407,7 @@ export default function AdvancedReports() {
                 </div>
               )}
 
-              {/* Detailed Daily/Monthly Cash Flow Breakdown */}
+              {/* Detailed Daily/Monthly Breakdown */}
               {cashFlowDetailedData && (
                 <div className="border-t pt-6">
                   <h3 className="text-lg font-semibold text-foreground mb-4">
@@ -1423,39 +1416,40 @@ export default function AdvancedReports() {
                      'Detalhamento Diário'}
                   </h3>
 
-                  {/* Year view: monthly totals table */}
-                  {periodType === 'year' && Object.keys(cashFlowDetailedData.monthly_totals).length > 0 && (
+                  {/* Year view: monthly totals — Entradas / Saídas / Saldo */}
+                  {periodType === 'year' && cashFlowDetailedData.daily_dre.length > 0 && (
                     <div className="overflow-x-auto rounded-lg border border-border">
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="bg-muted/50">
                             <th className="text-left px-4 py-3 font-semibold text-foreground">Mês</th>
-                            <th className="text-right px-3 py-3 font-semibold text-foreground">Receita Bruta</th>
-                            <th className="text-right px-3 py-3 font-semibold text-foreground">Margem Contrib.</th>
-                            <th className="text-right px-3 py-3 font-semibold text-foreground">Res. Operacional</th>
-                            <th className="text-right px-3 py-3 font-semibold text-foreground">Res. Líquido</th>
+                            <th className="text-right px-3 py-3 font-semibold text-green-700 dark:text-green-400">Entradas</th>
+                            <th className="text-right px-3 py-3 font-semibold text-red-700 dark:text-red-400">Saídas</th>
+                            <th className="text-right px-3 py-3 font-semibold text-foreground">Saldo do Mês</th>
+                            <th className="text-right px-3 py-3 font-semibold text-blue-700 dark:text-blue-400">Saldo Acumulado</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
                           {Object.entries(cashFlowDetailedData.monthly_totals)
                             .sort(([a], [b]) => a.localeCompare(b))
-                            .map(([monthKey, data]) => (
-                            <tr key={monthKey} className="hover:bg-accent/30">
-                              <td className="px-4 py-2 font-medium text-foreground">
-                                {format(new Date(monthKey + '-01T12:00:00'), 'MMM/yyyy', { locale: ptBR })}
-                              </td>
-                              <td className="px-3 py-2 text-right tabular-nums">{formatBRL(data.receita_bruta)}</td>
-                              <td className={`px-3 py-2 text-right tabular-nums ${data.margem_contribuicao < 0 ? 'text-red-600 dark:text-red-400' : ''}`}>
-                                {formatBRL(data.margem_contribuicao)}
-                              </td>
-                              <td className={`px-3 py-2 text-right tabular-nums ${data.resultado_operacional < 0 ? 'text-red-600 dark:text-red-400' : ''}`}>
-                                {formatBRL(data.resultado_operacional)}
-                              </td>
-                              <td className={`px-3 py-2 text-right tabular-nums font-semibold ${data.resultado_liquido < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
-                                {formatBRL(data.resultado_liquido)}
-                              </td>
-                            </tr>
-                          ))}
+                            .map(([monthKey, data]) => {
+                              const entradas = data.receita_bruta || 0;
+                              const saidas = (data.receita_bruta || 0) - (data.resultado_liquido || 0);
+                              const saldo = data.resultado_liquido || 0;
+                              return (
+                                <tr key={monthKey} className="hover:bg-accent/30">
+                                  <td className="px-4 py-2 font-medium text-foreground">
+                                    {format(new Date(monthKey + '-01T12:00:00'), 'MMMM/yyyy', { locale: ptBR })}
+                                  </td>
+                                  <td className="px-3 py-2 text-right tabular-nums text-green-600 dark:text-green-400">{formatBRL(entradas)}</td>
+                                  <td className="px-3 py-2 text-right tabular-nums text-red-600 dark:text-red-400">{formatBRL(-saidas)}</td>
+                                  <td className={`px-3 py-2 text-right tabular-nums font-semibold ${saldo < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                                    {formatBRL(saldo)}
+                                  </td>
+                                  <td className="px-3 py-2 text-right tabular-nums font-bold text-blue-600 dark:text-blue-400">—</td>
+                                </tr>
+                              );
+                            })}
                         </tbody>
                       </table>
                     </div>
@@ -1469,33 +1463,26 @@ export default function AdvancedReports() {
                           <tr className="bg-muted/50">
                             <th className="text-left px-4 py-3 font-semibold text-foreground">Descrição</th>
                             <th className="text-left px-3 py-3 font-semibold text-foreground">Categoria</th>
-                            <th className="text-left px-3 py-3 font-semibold text-foreground">Tipo</th>
-                            <th className="text-right px-4 py-3 font-semibold text-foreground">Valor</th>
+                            <th className="text-right px-3 py-3 font-semibold text-green-700 dark:text-green-400">Entrada</th>
+                            <th className="text-right px-4 py-3 font-semibold text-red-700 dark:text-red-400">Saída</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
-                          {cashFlowDetailedData.transactions.map((txn, i) => (
-                            <tr key={i} className="hover:bg-accent/30">
-                              <td className="px-4 py-2 text-foreground">{txn.description || '-'}</td>
-                              <td className="px-3 py-2 text-muted-foreground text-xs">{txn.category}</td>
-                              <td className="px-3 py-2">
-                                <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                                  ['receita', 'income'].includes(txn.transaction_type)
-                                    ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                                    : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
-                                }`}>
-                                  {txn.transaction_type}
-                                </span>
-                              </td>
-                              <td className={`px-4 py-2 text-right tabular-nums font-semibold ${
-                                ['receita', 'income'].includes(txn.transaction_type)
-                                  ? 'text-green-600 dark:text-green-400'
-                                  : 'text-red-600 dark:text-red-400'
-                              }`}>
-                                {formatBRL(txn.amount)}
-                              </td>
-                            </tr>
-                          ))}
+                          {cashFlowDetailedData.transactions.map((txn, i) => {
+                            const isIncome = ['receita', 'income'].includes(txn.transaction_type);
+                            return (
+                              <tr key={i} className="hover:bg-accent/30">
+                                <td className="px-4 py-2 text-foreground">{txn.description || '-'}</td>
+                                <td className="px-3 py-2 text-muted-foreground text-xs">{txn.category}</td>
+                                <td className="px-3 py-2 text-right tabular-nums text-green-600 dark:text-green-400">
+                                  {isIncome ? formatBRL(txn.amount) : '-'}
+                                </td>
+                                <td className="px-4 py-2 text-right tabular-nums text-red-600 dark:text-red-400">
+                                  {!isIncome ? formatBRL(txn.amount) : '-'}
+                                </td>
+                              </tr>
+                            );
+                          })}
                           {cashFlowDetailedData.transactions.length === 0 && (
                             <tr>
                               <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
@@ -1508,49 +1495,39 @@ export default function AdvancedReports() {
                     </div>
                   )}
 
-                  {/* Month/Week/Custom view: daily breakdown table */}
+                  {/* Month/Week/Custom view: daily Entradas / Saídas / Saldo */}
                   {!['year', 'day'].includes(periodType) && cashFlowDetailedData.daily_dre.length > 0 && (
                     <div className="overflow-x-auto rounded-lg border border-border">
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="bg-muted/50">
                             <th className="text-left px-3 py-3 font-semibold text-foreground sticky left-0 bg-muted/50">Dia</th>
-                            <th className="text-right px-2 py-3 font-semibold text-foreground whitespace-nowrap">Rec. Bruta</th>
-                            <th className="text-right px-2 py-3 font-semibold text-foreground whitespace-nowrap">Deduções</th>
-                            <th className="text-right px-2 py-3 font-semibold text-foreground whitespace-nowrap">Rec. Líq.</th>
-                            <th className="text-right px-2 py-3 font-semibold text-foreground whitespace-nowrap">Custos Var.</th>
-                            <th className="text-right px-2 py-3 font-semibold text-foreground whitespace-nowrap">Margem C.</th>
-                            <th className="text-right px-2 py-3 font-semibold text-foreground whitespace-nowrap">Custos Fix.</th>
-                            <th className="text-right px-2 py-3 font-semibold text-foreground whitespace-nowrap">Res. Op.</th>
-                            <th className="text-right px-2 py-3 font-semibold text-foreground whitespace-nowrap">Res. Líq.</th>
-                            <th className="text-right px-2 py-3 font-semibold text-foreground whitespace-nowrap">Acumulado</th>
+                            <th className="text-right px-3 py-3 font-semibold text-green-700 dark:text-green-400">Entradas</th>
+                            <th className="text-right px-3 py-3 font-semibold text-red-700 dark:text-red-400">Saídas</th>
+                            <th className="text-right px-3 py-3 font-semibold text-foreground">Saldo do Dia</th>
+                            <th className="text-right px-3 py-3 font-semibold text-blue-700 dark:text-blue-400">Saldo Acumulado</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
                           {cashFlowDetailedData.daily_dre.map((entry, i) => {
-                            const hasData = entry.receita_bruta !== 0 || entry.total_custos_variaveis !== 0 ||
-                              entry.total_custos_fixos !== 0 || entry.receitas_nao_operacionais !== 0 ||
-                              entry.despesas_nao_operacionais !== 0;
+                            const entradas = entry.receita_bruta + entry.receitas_nao_operacionais;
+                            const saidas = entry.total_deducoes + entry.total_custos_variaveis + entry.total_custos_fixos + entry.despesas_nao_operacionais;
+                            const hasData = entradas !== 0 || saidas !== 0;
                             return (
                               <tr key={i} className={`${hasData ? 'hover:bg-accent/30' : 'opacity-40'}`}>
-                                <td className="px-3 py-1.5 font-medium text-foreground sticky left-0 bg-card whitespace-nowrap">
+                                <td className="px-3 py-2 font-medium text-foreground sticky left-0 bg-card whitespace-nowrap">
                                   {format(new Date(entry.day + 'T12:00:00'), 'dd/MM (EEE)', { locale: ptBR })}
                                 </td>
-                                <td className="px-2 py-1.5 text-right tabular-nums">{entry.receita_bruta ? formatBRL(entry.receita_bruta) : '-'}</td>
-                                <td className="px-2 py-1.5 text-right tabular-nums text-red-600 dark:text-red-400">{entry.total_deducoes ? formatBRL(-entry.total_deducoes) : '-'}</td>
-                                <td className="px-2 py-1.5 text-right tabular-nums">{entry.receita_liquida ? formatBRL(entry.receita_liquida) : '-'}</td>
-                                <td className="px-2 py-1.5 text-right tabular-nums text-red-600 dark:text-red-400">{entry.total_custos_variaveis ? formatBRL(-entry.total_custos_variaveis) : '-'}</td>
-                                <td className={`px-2 py-1.5 text-right tabular-nums ${entry.margem_contribuicao < 0 ? 'text-red-600 dark:text-red-400' : ''}`}>
-                                  {entry.margem_contribuicao ? formatBRL(entry.margem_contribuicao) : '-'}
+                                <td className="px-3 py-2 text-right tabular-nums text-green-600 dark:text-green-400">
+                                  {entradas ? formatBRL(entradas) : '-'}
                                 </td>
-                                <td className="px-2 py-1.5 text-right tabular-nums text-red-600 dark:text-red-400">{entry.total_custos_fixos ? formatBRL(-entry.total_custos_fixos) : '-'}</td>
-                                <td className={`px-2 py-1.5 text-right tabular-nums font-medium ${entry.resultado_operacional < 0 ? 'text-red-600 dark:text-red-400' : ''}`}>
-                                  {entry.resultado_operacional ? formatBRL(entry.resultado_operacional) : '-'}
+                                <td className="px-3 py-2 text-right tabular-nums text-red-600 dark:text-red-400">
+                                  {saidas ? formatBRL(-saidas) : '-'}
                                 </td>
-                                <td className={`px-2 py-1.5 text-right tabular-nums font-semibold ${entry.resultado_liquido < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                                <td className={`px-3 py-2 text-right tabular-nums font-semibold ${entry.resultado_liquido < 0 ? 'text-red-600 dark:text-red-400' : entry.resultado_liquido > 0 ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
                                   {entry.resultado_liquido ? formatBRL(entry.resultado_liquido) : '-'}
                                 </td>
-                                <td className={`px-2 py-1.5 text-right tabular-nums font-bold ${entry.resultado_acumulado < 0 ? 'text-red-600 dark:text-red-400' : 'text-blue-600 dark:text-blue-400'}`}>
+                                <td className={`px-3 py-2 text-right tabular-nums font-bold ${entry.resultado_acumulado < 0 ? 'text-red-600 dark:text-red-400' : 'text-blue-600 dark:text-blue-400'}`}>
                                   {formatBRL(entry.resultado_acumulado)}
                                 </td>
                               </tr>
@@ -1562,19 +1539,6 @@ export default function AdvancedReports() {
                   )}
                 </div>
               )}
-
-              {/* Info Box */}
-              <div className="bg-green-500/5 border border-green-200 dark:border-green-800 rounded-lg p-6">
-                <h4 className="text-lg font-semibold text-foreground mb-2">ℹ️ Sobre o Fluxo de Caixa</h4>
-                <p className="text-muted-foreground">
-                  O Fluxo de Caixa mostra todas as movimentações financeiras em três categorias:
-                </p>
-                <ul className="list-disc list-inside mt-3 text-muted-foreground space-y-1">
-                  <li><strong className="text-foreground">Operacionais:</strong> Atividades principais do negócio</li>
-                  <li><strong className="text-foreground">Investimentos:</strong> Compra/venda de ativos fixos</li>
-                  <li><strong className="text-foreground">Financiamentos:</strong> Empréstimos, dividendos, capital social</li>
-                </ul>
-              </div>
             </CardContent>
           </Card>
         </TabsContent>
