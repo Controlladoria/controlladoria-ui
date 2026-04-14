@@ -242,7 +242,9 @@ export default function DocumentList({ onDocumentChange }: DocumentListProps) {
   };
 
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
+    // Append T12:00:00 to date-only strings to prevent UTC midnight → BRT day shift
+    const normalized = dateStr.includes('T') ? dateStr : dateStr + 'T12:00:00';
+    const date = new Date(normalized);
     return new Intl.DateTimeFormat("pt-BR").format(date);
   };
 

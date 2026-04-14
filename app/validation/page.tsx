@@ -428,7 +428,9 @@ export default function ValidationPage() {
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return "—";
     try {
-      return new Date(dateStr).toLocaleDateString("pt-BR");
+      // Append T12:00:00 to date-only strings to prevent UTC midnight → BRT day shift
+      const normalized = dateStr.includes('T') ? dateStr : dateStr + 'T12:00:00';
+      return new Date(normalized).toLocaleDateString("pt-BR");
     } catch {
       return dateStr;
     }
