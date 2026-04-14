@@ -254,8 +254,8 @@ export default function AdvancedReports() {
   };
 
   // ===== UNIFIED DATE STATE (above all tabs) =====
-  const [periodType, setPeriodType] = useState<string>("month");
-  const [referenceDate, setReferenceDate] = useState<string>(getCurrentMonth());
+  const [periodType, setPeriodType] = useState<string>("year");
+  const [referenceDate, setReferenceDate] = useState<string>(`${new Date().getFullYear()}-01-01`);
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
 
@@ -295,8 +295,14 @@ export default function AdvancedReports() {
   const cashFlowReferenceDate = referenceDate;
   const cashFlowStartDate = startDate;
   const cashFlowEndDate = endDate;
-  const balanceDate = referenceDate ? referenceDate.slice(0, 7) : getCurrentMonthInput();
-  const indicatorsDate = referenceDate ? referenceDate.slice(0, 7) : getCurrentMonthInput();
+  // Balance sheet & indicators use month-level dates.
+  // For YEAR period, use December (end of year), not January (start).
+  const balanceDate = (() => {
+    if (!referenceDate) return getCurrentMonthInput();
+    if (periodType === 'year') return `${referenceDate.slice(0, 4)}-12`;
+    return referenceDate.slice(0, 7);
+  })();
+  const indicatorsDate = balanceDate;
 
   // Export DRE
   const exportDRE = async (format: 'pdf' | 'excel' | 'csv') => {
@@ -570,13 +576,20 @@ export default function AdvancedReports() {
       const res = await api.get(`/reports/balance-sheet?${params.toString()}`);
       setBalanceData(res.data);
 
-      // Fetch previous month for comparison (non-blocking)
-      const d = new Date(`${effectiveDate}-01T12:00:00`);
-      d.setMonth(d.getMonth() - 1);
-      const prevY = d.getFullYear();
-      const prevM = String(d.getMonth() + 1).padStart(2, '0');
+      // Fetch previous period for comparison (non-blocking)
+      // Year: compare Dec current year vs Dec previous year
+      // Month: compare current month vs previous month
       const prevParams = new URLSearchParams();
-      prevParams.append('reference_date', `${prevY}-${prevM}-01`);
+      if (periodType === 'year') {
+        const prevYear = parseInt(effectiveDate.slice(0, 4)) - 1;
+        prevParams.append('reference_date', `${prevYear}-12-01`);
+      } else {
+        const d = new Date(`${effectiveDate}-01T12:00:00`);
+        d.setMonth(d.getMonth() - 1);
+        const prevY = d.getFullYear();
+        const prevM = String(d.getMonth() + 1).padStart(2, '0');
+        prevParams.append('reference_date', `${prevY}-${prevM}-01`);
+      }
       api.get(`/reports/balance-sheet?${prevParams.toString()}`)
         .then((prevRes: any) => setBalancePrevData(prevRes.data))
         .catch(() => setBalancePrevData(null));
