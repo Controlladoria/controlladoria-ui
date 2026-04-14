@@ -1298,6 +1298,26 @@ export default function AdvancedReports() {
                         return next;
                       });
                     };
+                    // Compute monthly entradas/saidas from daily entries (not from summary)
+                    const monthlyComputed: Record<string, { entradas: number; saidas: number; saldo: number }> = {};
+                    for (const [mk, days] of Object.entries(dailyByMonth)) {
+                      let mEntradas = 0, mSaidas = 0;
+                      for (const d of days) {
+                        mEntradas += d.receita_bruta + d.receitas_nao_operacionais;
+                        mSaidas += d.total_deducoes + d.total_custos_variaveis + d.total_custos_fixos + d.despesas_nao_operacionais;
+                      }
+                      monthlyComputed[mk] = { entradas: mEntradas, saidas: mSaidas, saldo: mEntradas - mSaidas };
+                    }
+
+                    // Running accumulated balance
+                    let runningAccumulated = 0;
+                    const sortedMonths = Object.keys(monthlyComputed).sort();
+                    const monthAccumulated: Record<string, number> = {};
+                    for (const mk of sortedMonths) {
+                      runningAccumulated += monthlyComputed[mk].saldo;
+                      monthAccumulated[mk] = runningAccumulated;
+                    }
+
                     return (
                     <div className="overflow-x-auto rounded-lg border border-border">
                       <table className="w-full text-sm">
@@ -1306,19 +1326,16 @@ export default function AdvancedReports() {
                             <th className="text-left px-4 py-3 font-semibold text-foreground">Mês</th>
                             <th className="text-right px-3 py-3 font-semibold text-green-700 dark:text-green-400">Entradas</th>
                             <th className="text-right px-3 py-3 font-semibold text-red-700 dark:text-red-400">Saídas</th>
-                            <th className="text-right px-3 py-3 font-semibold text-foreground">Saldo</th>
+                            <th className="text-right px-3 py-3 font-semibold text-foreground">Saldo do Mês</th>
                             <th className="text-right px-3 py-3 font-semibold text-blue-700 dark:text-blue-400">Acumulado</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
-                          {Object.entries(cashFlowDetailedData.monthly_totals)
-                            .sort(([a], [b]) => a.localeCompare(b))
-                            .map(([monthKey, data]) => {
-                              const entradas = data.receita_bruta || 0;
-                              const saidas = (data.receita_bruta || 0) - (data.resultado_liquido || 0);
-                              const saldo = data.resultado_liquido || 0;
+                          {sortedMonths.map((monthKey) => {
+                              const mc = monthlyComputed[monthKey];
                               const isExpanded = expandedMonths.has(monthKey);
                               const monthDays = dailyByMonth[monthKey] || [];
+                              const acum = monthAccumulated[monthKey];
                               return (
                                 <React.Fragment key={monthKey}>
                                   <tr
@@ -1332,12 +1349,14 @@ export default function AdvancedReports() {
                                         <span className="text-xs text-muted-foreground font-normal">({monthDays.length} dias)</span>
                                       </span>
                                     </td>
-                                    <td className="px-3 py-2.5 text-right tabular-nums text-green-600 dark:text-green-400">{formatBRL(entradas)}</td>
-                                    <td className="px-3 py-2.5 text-right tabular-nums text-red-600 dark:text-red-400">{formatBRL(-saidas)}</td>
-                                    <td className={`px-3 py-2.5 text-right tabular-nums font-semibold ${saldo < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
-                                      {formatBRL(saldo)}
+                                    <td className="px-3 py-2.5 text-right tabular-nums text-green-600 dark:text-green-400">{formatBRL(mc.entradas)}</td>
+                                    <td className="px-3 py-2.5 text-right tabular-nums text-red-600 dark:text-red-400">{formatBRL(-mc.saidas)}</td>
+                                    <td className={`px-3 py-2.5 text-right tabular-nums font-semibold ${mc.saldo < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                                      {formatBRL(mc.saldo)}
                                     </td>
-                                    <td className="px-3 py-2.5 text-right tabular-nums font-bold text-blue-600 dark:text-blue-400">—</td>
+                                    <td className={`px-3 py-2.5 text-right tabular-nums font-bold ${acum < 0 ? 'text-red-600 dark:text-red-400' : 'text-blue-600 dark:text-blue-400'}`}>
+                                      {formatBRL(acum)}
+                                    </td>
                                   </tr>
                                   {isExpanded && monthDays.map((entry, di) => {
                                     const dayEntradas = entry.receita_bruta + entry.receitas_nao_operacionais;

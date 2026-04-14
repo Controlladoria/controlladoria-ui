@@ -1,11 +1,73 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
-import { X, Search, Download, Filter, ChevronDown, ChevronUp, FileText, DollarSign, Calendar, Building2, Hash, Tag, Edit, Save, AlertTriangle, Trash2, Plus, Copy } from "lucide-react";
+import { useState, useMemo, useEffect, useRef } from "react";
+import { X, Search, Download, Filter, ChevronDown, ChevronUp, FileText, DollarSign, Calendar, Building2, Hash, Tag, Edit, Save, AlertTriangle, Trash2, Plus, Copy, Check, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { apiClient } from "@/lib/api";
 import { toast } from "sonner";
 import { formatCategory, getCategoryDisplayName, CATEGORY_MAP } from "@/lib/categories";
+import { cn } from "@/lib/utils";
+
+function CategoryCombobox({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const categories = useMemo(() =>
+    Object.entries(CATEGORY_MAP).map(([key, info]) => ({
+      key,
+      label: `${info.displayName}`,
+      search: `${info.nature} ${info.accountCode} ${info.displayName} ${key}`.toLowerCase(),
+      nature: info.nature,
+    })),
+    []
+  );
+  const selected = categories.find(c => c.key === value);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          className="w-full flex items-center justify-between bg-background border border-input text-foreground rounded px-1.5 py-1 text-xs hover:bg-accent/50 min-w-[140px]"
+        >
+          <span className="truncate text-left">
+            {selected ? selected.label : "Selecionar..."}
+          </span>
+          <ChevronsUpDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[280px] p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Buscar categoria..." className="h-8 text-sm" />
+          <CommandList>
+            <CommandEmpty>Nenhuma categoria encontrada.</CommandEmpty>
+            <CommandGroup className="max-h-[200px] overflow-auto">
+              <CommandItem
+                value="__none__"
+                onSelect={() => { onChange(""); setOpen(false); }}
+                className="text-xs"
+              >
+                <Check className={cn("mr-1.5 h-3 w-3", !value ? "opacity-100" : "opacity-0")} />
+                Sem categoria
+              </CommandItem>
+              {categories.map((cat) => (
+                <CommandItem
+                  key={cat.key}
+                  value={cat.search}
+                  onSelect={() => { onChange(cat.key); setOpen(false); }}
+                  className="text-xs"
+                >
+                  <Check className={cn("mr-1.5 h-3 w-3", value === cat.key ? "opacity-100" : "opacity-0")} />
+                  <span className="text-muted-foreground mr-1">{cat.nature}</span>
+                  {cat.label}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 interface Transaction {
   date?: string;
@@ -79,7 +141,7 @@ export default function DocumentViewerModal({ isOpen, onClose, document, onUpdat
 
   // Add defensive null checking - moved before early return
   const extractedData = document?.extracted_data || {};
-  const data: DocumentData = isEditing && editedData ? editedData : extractedData;
+  const data: DocumentData = editedData || extractedData;
   const isLedger = data.document_type === "transaction_ledger";
   const confidenceScore = data.confidence_score || 0;
   const isLowConfidence = confidenceScore < 0.7;
@@ -244,7 +306,10 @@ export default function DocumentViewerModal({ isOpen, onClose, document, onUpdat
       account: "",
       notes: "",
     };
-    const newTxns = [...(editedData?.transactions || []), newTxn];
+    const txns = editedData?.transactions || [];
+    // Insert at the end of the current page, not the end of the array
+    const insertAt = Math.min(currentPage * itemsPerPage, txns.length);
+    const newTxns = [...txns.slice(0, insertAt), newTxn, ...txns.slice(insertAt)];
     setEditedData({ ...editedData!, transactions: newTxns });
   };
 
@@ -644,13 +709,13 @@ export default function DocumentViewerModal({ isOpen, onClose, document, onUpdat
                     <table className="w-full">
                       <thead className="bg-gradient-to-r from-indigo-600 to-purple-600">
                         <tr>
-                          <th className="px-6 py-5 text-left text-base font-bold text-white">Data</th>
-                          <th className="px-6 py-5 text-left text-base font-bold text-white">Descrição</th>
-                          <th className="px-6 py-5 text-left text-base font-bold text-white">Categoria</th>
-                          <th className="px-6 py-5 text-left text-base font-bold text-white">Tipo</th>
-                          <th className="px-6 py-5 text-right text-base font-bold text-white">Valor</th>
-                          <th className="px-6 py-5 text-left text-base font-bold text-white">Referência</th>
-                          {isEditing && <th className="px-6 py-5 text-center text-base font-bold text-white">Ações</th>}
+                          <th className="px-3 py-3 text-left text-sm font-bold text-white">Data</th>
+                          <th className="px-3 py-3 text-left text-sm font-bold text-white">Descrição</th>
+                          <th className="px-3 py-3 text-left text-sm font-bold text-white">Categoria</th>
+                          <th className="px-2 py-3 text-left text-sm font-bold text-white">Tipo</th>
+                          <th className="px-3 py-3 text-right text-sm font-bold text-white">Valor</th>
+                          {!isEditing && <th className="px-3 py-3 text-left text-sm font-bold text-white">Referência</th>}
+                          {isEditing && <th className="px-2 py-3 text-center text-sm font-bold text-white w-16">Ações</th>}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border bg-card">
@@ -658,47 +723,39 @@ export default function DocumentViewerModal({ isOpen, onClose, document, onUpdat
                           const actualIdx = (currentPage - 1) * itemsPerPage + idx;
                           return (
                             <tr key={idx} className={`transition-colors hover:bg-accent/50 ${idx % 2 === 0 ? 'bg-accent/20' : 'bg-card'}`}>
-                              <td className="px-6 py-5 whitespace-nowrap text-base font-medium text-foreground">
+                              <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-foreground">
                                 {isEditing ? (
                                   <input
                                     type="date"
                                     value={txn.date || ""}
                                     onChange={(e) => updateTransaction(actualIdx, "date", e.target.value)}
-                                    className="bg-background border-2 border-input text-foreground rounded px-2 py-1 focus:ring-2 focus:ring-indigo-500"
+                                    className="bg-background border border-input text-foreground rounded px-1.5 py-1 text-sm focus:ring-2 focus:ring-indigo-500 w-[130px]"
                                   />
                                 ) : (
                                   formatDate(txn.date)
                                 )}
                               </td>
-                              <td className="px-6 py-5 text-base text-foreground max-w-md">
+                              <td className="px-3 py-2 text-sm text-foreground max-w-xs">
                                 {isEditing ? (
                                   <input
                                     type="text"
                                     value={txn.description || ""}
                                     onChange={(e) => updateTransaction(actualIdx, "description", e.target.value)}
-                                    className="w-full bg-background border-2 border-input text-foreground rounded px-2 py-1 focus:ring-2 focus:ring-indigo-500"
+                                    className="w-full bg-background border border-input text-foreground rounded px-1.5 py-1 text-sm focus:ring-2 focus:ring-indigo-500"
                                   />
                                 ) : (
                                   <>
                                     <div className="font-semibold">{txn.description || "-"}</div>
-                                    {txn.notes && <div className="text-sm text-muted-foreground mt-1">{txn.notes}</div>}
+                                    {txn.notes && <div className="text-xs text-muted-foreground mt-0.5">{txn.notes}</div>}
                                   </>
                                 )}
                               </td>
-                              <td className="px-6 py-5 whitespace-nowrap text-base">
+                              <td className="px-3 py-2 whitespace-nowrap text-sm">
                                 {isEditing ? (
-                                  <select
+                                  <CategoryCombobox
                                     value={txn.category || ""}
-                                    onChange={(e) => updateTransaction(actualIdx, "category", e.target.value)}
-                                    className="w-full bg-background border-2 border-input text-foreground rounded px-2 py-1 focus:ring-2 focus:ring-indigo-500 text-sm"
-                                  >
-                                    <option value="">Sem categoria</option>
-                                    {Object.entries(CATEGORY_MAP).map(([key, info]) => (
-                                      <option key={key} value={key}>
-                                        {info.nature} - {info.accountCode} - {info.displayName}
-                                      </option>
-                                    ))}
-                                  </select>
+                                    onChange={(v) => updateTransaction(actualIdx, "category", v)}
+                                  />
                                 ) : (
                                   txn.category ? (
                                     <span className="px-3 py-1.5 bg-blue-500/10 dark:bg-blue-500/20 text-blue-800 dark:text-blue-400 rounded-full text-sm font-semibold" title={txn.category}>
@@ -709,43 +766,43 @@ export default function DocumentViewerModal({ isOpen, onClose, document, onUpdat
                                   )
                                 )}
                               </td>
-                              <td className="px-6 py-5 whitespace-nowrap text-base">
+                              <td className="px-2 py-2 whitespace-nowrap text-sm">
                                 {isEditing ? (
                                   <select
                                     value={txn.transaction_type}
                                     onChange={(e) => updateTransaction(actualIdx, "transaction_type", e.target.value)}
-                                    className="bg-background border-2 border-input text-foreground rounded px-2 py-1 focus:ring-2 focus:ring-indigo-500"
+                                    className="bg-background border border-input text-foreground rounded px-1.5 py-1 text-xs focus:ring-2 focus:ring-indigo-500"
                                   >
-                                    <option value="receita">💰 Receita</option>
-                                    <option value="despesa">💸 Despesa</option>
-                                    <option value="custo">💸 Custo</option>
-                                    <option value="investimento">📈 Investimento</option>
-                                    <option value="perda">⚠️ Perda</option>
+                                    <option value="receita">Receita</option>
+                                    <option value="despesa">Despesa</option>
+                                    <option value="custo">Custo</option>
+                                    <option value="investimento">Investimento</option>
+                                    <option value="perda">Perda</option>
                                   </select>
                                 ) : (
-                                  <span className={`px-4 py-1.5 rounded-full text-sm font-bold shadow-sm ${
+                                  <span className={`px-2 py-1 rounded-full text-xs font-bold ${
                                     txn.transaction_type === "receita"
-                                      ? "bg-green-500/10 dark:bg-green-500/20 text-green-800 dark:text-green-400 border border-green-500/20"
+                                      ? "bg-green-500/10 text-green-800 dark:text-green-400"
                                       : txn.transaction_type === "custo"
-                                      ? "bg-orange-500/10 dark:bg-orange-500/20 text-orange-800 dark:text-orange-400 border border-orange-500/20"
+                                      ? "bg-orange-500/10 text-orange-800 dark:text-orange-400"
                                       : txn.transaction_type === "investimento"
-                                      ? "bg-blue-500/10 dark:bg-blue-500/20 text-blue-800 dark:text-blue-400 border border-blue-500/20"
+                                      ? "bg-blue-500/10 text-blue-800 dark:text-blue-400"
                                       : txn.transaction_type === "perda"
-                                      ? "bg-gray-500/10 dark:bg-gray-500/20 text-gray-800 dark:text-gray-400 border border-gray-500/20"
-                                      : "bg-red-500/10 dark:bg-red-500/20 text-red-800 dark:text-red-400 border border-red-500/20"
+                                      ? "bg-gray-500/10 text-gray-800 dark:text-gray-400"
+                                      : "bg-red-500/10 text-red-800 dark:text-red-400"
                                   }`}>
-                                    {txn.transaction_type === "receita" ? "💰 Receita" : txn.transaction_type === "custo" ? "💸 Custo" : txn.transaction_type === "investimento" ? "📈 Investimento" : txn.transaction_type === "perda" ? "⚠️ Perda" : "💸 Despesa"}
+                                    {txn.transaction_type === "receita" ? "Receita" : txn.transaction_type === "custo" ? "Custo" : txn.transaction_type === "investimento" ? "Investimento" : txn.transaction_type === "perda" ? "Perda" : "Despesa"}
                                   </span>
                                 )}
                               </td>
-                              <td className="px-6 py-5 whitespace-nowrap text-right text-lg font-bold">
+                              <td className="px-3 py-2 whitespace-nowrap text-right text-sm font-bold">
                                 {isEditing ? (
                                   <input
                                     type="number"
                                     step="0.01"
                                     value={txn.amount}
                                     onChange={(e) => updateTransaction(actualIdx, "amount", parseFloat(e.target.value) || 0)}
-                                    className="w-full bg-background border-2 border-input text-foreground rounded px-2 py-1 text-right focus:ring-2 focus:ring-indigo-500"
+                                    className="w-full bg-background border border-input text-foreground rounded px-1.5 py-1 text-sm text-right focus:ring-2 focus:ring-indigo-500 w-[110px]"
                                   />
                                 ) : (
                                   <span className={txn.transaction_type === "receita" ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}>
@@ -753,34 +810,27 @@ export default function DocumentViewerModal({ isOpen, onClose, document, onUpdat
                                   </span>
                                 )}
                               </td>
-                              <td className="px-6 py-5 whitespace-nowrap text-base font-medium text-foreground">
-                                {isEditing ? (
-                                  <input
-                                    type="text"
-                                    value={txn.reference || ""}
-                                    onChange={(e) => updateTransaction(actualIdx, "reference", e.target.value)}
-                                    className="w-full bg-background border-2 border-input text-foreground rounded px-2 py-1 focus:ring-2 focus:ring-indigo-500"
-                                  />
-                                ) : (
-                                  txn.reference || <span className="text-muted-foreground">-</span>
-                                )}
-                              </td>
+                              {!isEditing && (
+                                <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-foreground">
+                                  {txn.reference || <span className="text-muted-foreground">-</span>}
+                                </td>
+                              )}
                               {isEditing && (
-                                <td className="px-6 py-5 text-center">
-                                  <div className="flex gap-1 justify-center">
+                                <td className="px-2 py-2 text-center w-16">
+                                  <div className="flex gap-0.5 justify-center">
                                     <button
                                       onClick={() => duplicateTransaction(actualIdx)}
-                                      className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 dark:hover:bg-blue-500/20 rounded-lg transition-colors"
-                                      title="Duplicar transação (rateio)"
+                                      className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 rounded transition-colors"
+                                      title="Duplicar"
                                     >
-                                      <Copy className="w-5 h-5" />
+                                      <Copy className="w-4 h-4" />
                                     </button>
                                     <button
                                       onClick={() => removeTransaction(actualIdx)}
-                                      className="p-2 text-red-600 dark:text-red-400 hover:bg-red-500/10 dark:hover:bg-red-500/20 rounded-lg transition-colors"
-                                      title="Remover transação"
+                                      className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                                      title="Remover"
                                     >
-                                      <Trash2 className="w-5 h-5" />
+                                      <Trash2 className="w-4 h-4" />
                                     </button>
                                   </div>
                                 </td>
