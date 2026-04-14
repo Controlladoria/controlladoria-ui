@@ -845,7 +845,7 @@ export default function AdvancedReports() {
                 <InfoModal title="O que é o Fluxo de Caixa?" iconSize="w-3.5 h-3.5">
                   <p>A <strong>Demonstração do Fluxo de Caixa (DFC)</strong> mostra as entradas e saídas reais de dinheiro da empresa.</p>
                   <p>Divide-se em três atividades: <strong>Operacionais</strong> (dia a dia), <strong>Investimentos</strong> (compra/venda de ativos) e <strong>Financiamentos</strong> (empréstimos, capital).</p>
-                  <p>O <strong>método direto</strong> lista pagamentos e recebimentos reais. O <strong>método indireto</strong> parte do lucro líquido e ajusta por itens não-caixa.</p>
+                  <p>Mostra o saldo inicial, todas as entradas e saídas de dinheiro, e o saldo final do período.</p>
                 </InfoModal>
               </TabsTrigger>
             );
@@ -1276,58 +1276,10 @@ export default function AdvancedReports() {
             <CardHeader>
               <CardTitle className="text-2xl">Demonstração do Fluxo de Caixa (DFC)</CardTitle>
               <CardDescription className="text-base mt-2">
-                Movimentações de entradas e saídas de caixa (Método Direto ou Indireto)
+                Saldo Inicial, Entradas, Saídas e Saldo Final do período
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Method Selector (stays in this tab) */}
-              <div>
-                <label className="block text-base font-semibold text-foreground mb-3">Método de Cálculo (CPC 03)</label>
-                {hasCashFlowAccess ? (
-                  <>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <Button
-                        variant={cashFlowMethod === "indirect" ? "default" : "outline"}
-                        onClick={() => setCashFlowMethod("indirect")}
-                        className="text-base px-4 py-6 h-auto"
-                      >
-                        🔄 Método Indireto
-                      </Button>
-                      <Button
-                        variant={cashFlowMethod === "direct" ? "default" : "outline"}
-                        onClick={() => setCashFlowMethod("direct")}
-                        className="text-base px-4 py-6 h-auto"
-                      >
-                        💵 Método Direto
-                      </Button>
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      {cashFlowMethod === 'indirect'
-                        ? 'Parte do Lucro Líquido e ajusta pelas variações patrimoniais (mais comum)'
-                        : 'Mostra recebimentos e pagamentos reais em dinheiro'}
-                    </p>
-                  </>
-                ) : (
-                  <div className="relative">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 opacity-50 pointer-events-none">
-                      <Button variant="outline" className="text-base px-4 py-6 h-auto">
-                        🔄 Método Indireto
-                      </Button>
-                      <Button variant="outline" className="text-base px-4 py-6 h-auto">
-                        💵 Método Direto
-                      </Button>
-                    </div>
-                    <div className="mt-3 flex items-center gap-2 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-lg p-4">
-                      <Lock className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
-                      <p className="text-sm text-amber-800 dark:text-amber-300">
-                        A escolha entre Método Direto e Indireto está disponível nos planos <strong>Pro</strong> e <strong>Max</strong>.
-                        No plano Básico, o fluxo de caixa utiliza o método básico simplificado.
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-
               {/* Export Buttons */}
               <div className="flex flex-wrap gap-3">
                   <Button
