@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
-import { stripeApiClient, type PlanInfo } from '@/lib/stripe-api';
+import { paymentApiClient, type PlanInfo } from '@/lib/payment-api';
 import { toast } from 'sonner';
 import { Check } from 'lucide-react';
 
@@ -58,7 +58,7 @@ export default function PricingPage() {
   useEffect(() => {
     async function loadPlans() {
       try {
-        const data = await stripeApiClient.getPlans();
+        const data = await paymentApiClient.getPlans();
         setPlans(data);
       } catch (error) {
         console.error('Failed to load plans:', error);

@@ -7,7 +7,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
-import { stripeApiClient, type SubscriptionStatus } from '@/lib/stripe-api';
+import { paymentApiClient, type SubscriptionStatus } from '@/lib/payment-api';
 
 interface SubscriptionContextType {
   subscription: SubscriptionStatus | null;
@@ -95,7 +95,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     }
 
     try {
-      const status = await stripeApiClient.getSubscriptionStatus();
+      const status = await paymentApiClient.getSubscriptionStatus();
       setSubscription(status);
     } catch (error: any) {
       // If it's a 401, the auth interceptor handles redirect — don't set sub to null
@@ -119,7 +119,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   // Refresh subscription status
   const refreshSubscription = async () => {
     try {
-      const status = await stripeApiClient.getSubscriptionStatus();
+      const status = await paymentApiClient.getSubscriptionStatus();
       setSubscription(status);
     } catch (error) {
       console.error('Failed to refresh subscription:', error);
@@ -130,7 +130,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   // Start Stripe Checkout
   const startCheckout = async (plan: string = 'basic') => {
     try {
-      const { checkout_url } = await stripeApiClient.createCheckoutSession(plan);
+      const { checkout_url } = await paymentApiClient.createCheckout(plan);
       // Redirect to Stripe Checkout
       window.location.href = checkout_url;
     } catch (error) {
@@ -139,22 +139,15 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     }
   };
 
-  // Open Stripe Customer Portal
+  // Open subscription management page (replaces Stripe Customer Portal)
   const openCustomerPortal = async () => {
-    try {
-      const { portal_url } = await stripeApiClient.createPortalSession();
-      // Redirect to Stripe Customer Portal
-      window.location.href = portal_url;
-    } catch (error) {
-      console.error('Failed to open customer portal:', error);
-      throw error;
-    }
+    window.location.href = '/account/subscription';
   };
 
   // Cancel subscription
   const cancelSubscription = async (immediate: boolean = false) => {
     try {
-      await stripeApiClient.cancelSubscription(immediate);
+      await paymentApiClient.cancelSubscription(immediate);
       await refreshSubscription();
     } catch (error) {
       console.error('Failed to cancel subscription:', error);

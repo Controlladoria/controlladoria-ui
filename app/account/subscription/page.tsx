@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
-import { stripeApiClient, type PlanInfo } from '@/lib/stripe-api';
+import { paymentApiClient, type PlanInfo, type PaymentRecord } from '@/lib/payment-api';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import Sidebar from '@/components/layout/Sidebar';
 import { toast } from 'sonner';
@@ -86,7 +86,7 @@ function SubscriptionPageContent() {
   useEffect(() => {
     async function loadPlans() {
       try {
-        const data = await stripeApiClient.getPlans();
+        const data = await paymentApiClient.getPlans();
         setPlans(data);
       } catch (error) {
         console.error('Failed to load plans:', error);
