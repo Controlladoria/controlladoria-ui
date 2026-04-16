@@ -11,6 +11,8 @@ import {
   Eye, Search, Calendar, User, FileEdit, Trash2, PlusCircle
 } from 'lucide-react';
 import { formatBrazilianDateTime } from '@/lib/date-utils';
+import { DatePicker } from '@/components/ui/date-picker';
+import { format } from 'date-fns';
 
 interface AuditLog {
   id: number;
@@ -242,11 +244,10 @@ function AuditLogsPageContent() {
                     <label className="block text-sm font-medium text-foreground mb-1">
                       Data Início
                     </label>
-                    <input
-                      type="date"
-                      value={filters.date_from}
-                      onChange={(e) => setFilters({ ...filters, date_from: e.target.value })}
-                      className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-background text-foreground"
+                    <DatePicker
+                      value={filters.date_from ? new Date(filters.date_from + 'T12:00:00') : undefined}
+                      onChange={(d) => setFilters({ ...filters, date_from: d ? format(d, 'yyyy-MM-dd') : '' })}
+                      placeholder="Data início"
                     />
                   </div>
 
@@ -254,11 +255,10 @@ function AuditLogsPageContent() {
                     <label className="block text-sm font-medium text-foreground mb-1">
                       Data Fim
                     </label>
-                    <input
-                      type="date"
-                      value={filters.date_to}
-                      onChange={(e) => setFilters({ ...filters, date_to: e.target.value })}
-                      className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-background text-foreground"
+                    <DatePicker
+                      value={filters.date_to ? new Date(filters.date_to + 'T12:00:00') : undefined}
+                      onChange={(d) => setFilters({ ...filters, date_to: d ? format(d, 'yyyy-MM-dd') : '' })}
+                      placeholder="Data fim"
                     />
                   </div>
 

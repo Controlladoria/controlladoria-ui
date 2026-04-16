@@ -9,6 +9,8 @@ import { apiClient } from "@/lib/api";
 import { toast } from "sonner";
 import { formatCategory, getCategoryDisplayName, CATEGORY_MAP } from "@/lib/categories";
 import { cn } from "@/lib/utils";
+import { DatePicker } from "@/components/ui/date-picker";
+import { format } from "date-fns";
 
 function CategoryCombobox({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const [open, setOpen] = useState(false);
@@ -307,10 +309,15 @@ export default function DocumentViewerModal({ isOpen, onClose, document, onUpdat
       notes: "",
     };
     const txns = editedData?.transactions || [];
-    // Insert at the end of the current page, not the end of the array
+    // Insert at the end of current page's visible range
     const insertAt = Math.min(currentPage * itemsPerPage, txns.length);
     const newTxns = [...txns.slice(0, insertAt), newTxn, ...txns.slice(insertAt)];
     setEditedData({ ...editedData!, transactions: newTxns });
+    // Navigate to the page where the new row landed
+    const newRowPage = Math.ceil((insertAt + 1) / itemsPerPage);
+    if (newRowPage !== currentPage) {
+      setCurrentPage(newRowPage);
+    }
   };
 
   const removeTransaction = (index: number) => {
@@ -580,11 +587,11 @@ export default function DocumentViewerModal({ isOpen, onClose, document, onUpdat
                         <span className="text-xs font-medium">Data de Emissão</span>
                       </div>
                       {isEditing ? (
-                        <input
-                          type="date"
-                          value={data.issue_date || ""}
-                          onChange={(e) => updateField("issue_date", e.target.value)}
-                          className="w-full text-sm font-bold text-foreground bg-background border border-input rounded px-2 py-1 focus:ring-2 focus:ring-blue-500"
+                        <DatePicker
+                          value={data.issue_date ? new Date(data.issue_date + 'T12:00:00') : undefined}
+                          onChange={(d) => updateField("issue_date", d ? format(d, 'yyyy-MM-dd') : '')}
+                          placeholder="Selecione a data"
+                          className="w-full"
                         />
                       ) : (
                         <p className="text-sm font-bold text-foreground">{formatDate(data.issue_date)}</p>
@@ -725,11 +732,11 @@ export default function DocumentViewerModal({ isOpen, onClose, document, onUpdat
                             <tr key={idx} className={`transition-colors hover:bg-accent/50 ${idx % 2 === 0 ? 'bg-accent/20' : 'bg-card'}`}>
                               <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-foreground">
                                 {isEditing ? (
-                                  <input
-                                    type="date"
-                                    value={txn.date || ""}
-                                    onChange={(e) => updateTransaction(actualIdx, "date", e.target.value)}
-                                    className="bg-background border border-input text-foreground rounded px-1.5 py-1 text-sm focus:ring-2 focus:ring-indigo-500 w-[130px]"
+                                  <DatePicker
+                                    value={txn.date ? new Date(txn.date + 'T12:00:00') : undefined}
+                                    onChange={(d) => updateTransaction(actualIdx, "date", d ? format(d, 'yyyy-MM-dd') : '')}
+                                    placeholder="Data"
+                                    className="w-[140px]"
                                   />
                                 ) : (
                                   formatDate(txn.date)

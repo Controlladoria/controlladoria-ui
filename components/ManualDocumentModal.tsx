@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { DatePicker } from "@/components/ui/date-picker";
+import { format } from "date-fns";
 
 interface LineItem {
   description: string;
@@ -257,11 +259,10 @@ export default function ManualDocumentModal({ isOpen, onClose, onSuccess }: Manu
                 </div>
                 <div>
                   <label className="block text-base font-semibold text-foreground mb-2">Data de Emissão</label>
-                  <input
-                    type="date"
-                    value={issueDate}
-                    onChange={(e) => setIssueDate(e.target.value)}
-                    className="w-full px-4 py-3 text-base bg-background border-2 border-input text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                  <DatePicker
+                    value={issueDate ? new Date(issueDate + 'T12:00:00') : undefined}
+                    onChange={(d) => setIssueDate(d ? format(d, 'yyyy-MM-dd') : '')}
+                    placeholder="Selecione a data"
                   />
                 </div>
                 <div>
@@ -475,11 +476,10 @@ export default function ManualDocumentModal({ isOpen, onClose, onSuccess }: Manu
                     <div className="grid grid-cols-12 gap-3 items-start">
                       <div className="col-span-2">
                         <label className="block text-xs font-medium text-muted-foreground mb-1">Data</label>
-                        <input
-                          type="date"
-                          value={txn.date || ""}
-                          onChange={(e) => updateTransaction(idx, "date", e.target.value)}
-                          className="w-full px-3 py-2 text-sm bg-background border-2 border-input text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                        <DatePicker
+                          value={txn.date ? new Date(txn.date + 'T12:00:00') : undefined}
+                          onChange={(d) => updateTransaction(idx, "date", d ? format(d, 'yyyy-MM-dd') : '')}
+                          placeholder="Data"
                         />
                       </div>
                       <div className="col-span-3">

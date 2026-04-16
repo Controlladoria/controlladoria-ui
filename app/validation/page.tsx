@@ -34,6 +34,8 @@ import { ChevronsUpDown } from "lucide-react";
 import SubscriptionGuard from "@/components/stripe/SubscriptionGuard";
 import { InfoModal } from "@/components/ui/info-modal";
 import { cn } from "@/lib/utils";
+import { DatePicker } from "@/components/ui/date-picker";
+import { format } from "date-fns";
 
 interface ValidationDocument {
   id: number;
@@ -754,16 +756,11 @@ export default function ValidationPage() {
                                       // Editing mode
                                       <>
                                         <td className="px-4 py-2">
-                                          <Input
-                                            type="date"
-                                            value={editForm.transaction_date || ""}
-                                            onChange={(e) =>
-                                              setEditForm((prev) => ({
-                                                ...prev,
-                                                transaction_date: e.target.value,
-                                              }))
-                                            }
-                                            className="h-9 text-sm w-[140px]"
+                                          <DatePicker
+                                            value={editForm.transaction_date ? new Date(editForm.transaction_date + 'T12:00:00') : undefined}
+                                            onChange={(d) => setEditForm((prev) => ({ ...prev, transaction_date: d ? format(d, 'yyyy-MM-dd') : '' }))}
+                                            placeholder="Data"
+                                            className="w-[140px]"
                                           />
                                         </td>
                                         <td className="px-4 py-2">
@@ -1051,14 +1048,10 @@ export default function ValidationPage() {
                               <div className="p-4 bg-blue-500/5">
                                 <p className="text-sm font-medium text-foreground mb-3">Adicionar nova linha</p>
                                 <div className="grid grid-cols-1 sm:grid-cols-6 gap-2 items-end">
-                                  <Input
-                                    type="date"
+                                  <DatePicker
+                                    value={newRowForm.transaction_date ? new Date(newRowForm.transaction_date + 'T12:00:00') : undefined}
+                                    onChange={(d) => setNewRowForm((prev) => ({ ...prev, transaction_date: d ? format(d, 'yyyy-MM-dd') : '' }))}
                                     placeholder="Data"
-                                    value={newRowForm.transaction_date || ""}
-                                    onChange={(e) =>
-                                      setNewRowForm((prev) => ({ ...prev, transaction_date: e.target.value }))
-                                    }
-                                    className="h-8 text-sm"
                                   />
                                   <Input
                                     placeholder="Descrição"
