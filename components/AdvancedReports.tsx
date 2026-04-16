@@ -352,7 +352,7 @@ export default function AdvancedReports() {
       const a = document.createElement('a');
       a.href = url;
       // Build descriptive filename: DRE - Company - Period
-      const company = user?.company_name || 'Empresa';
+      const company = dreData?.company_name || cashFlowData?.company_name || balanceData?.company_name || user?.company_name || 'Empresa';
       const period = drePeriodType === 'custom'
         ? `${dreStartDate}_a_${dreEndDate}`
         : dreReferenceDate || new Date().toISOString().slice(0, 7);
@@ -408,7 +408,7 @@ export default function AdvancedReports() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      const company = user?.company_name || 'Empresa';
+      const company = dreData?.company_name || cashFlowData?.company_name || balanceData?.company_name || user?.company_name || 'Empresa';
       const period = balanceDate || new Date().toISOString().slice(0, 7);
       a.download = `Balanço Gerencial - ${company} - ${period}.${format === 'excel' ? 'xlsx' : format}`;
       document.body.appendChild(a);
@@ -472,7 +472,7 @@ export default function AdvancedReports() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      const company = user?.company_name || 'Empresa';
+      const company = dreData?.company_name || cashFlowData?.company_name || balanceData?.company_name || user?.company_name || 'Empresa';
       const period = cashFlowPeriodType === 'custom'
         ? `${cashFlowStartDate}_a_${cashFlowEndDate}`
         : cashFlowReferenceDate || new Date().toISOString().slice(0, 7);
@@ -918,9 +918,13 @@ export default function AdvancedReports() {
                   }
                 }
                 const prevLabel = drePrevData
-                  ? `${new Date(drePrevData.start_date + 'T12:00:00').toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' })}`
+                  ? (periodType === 'year'
+                    ? String(new Date(drePrevData.start_date + 'T12:00:00').getFullYear())
+                    : new Date(drePrevData.start_date + 'T12:00:00').toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }))
                   : null;
-                const currLabel = `${new Date(dreData.start_date + 'T12:00:00').toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' })}`;
+                const currLabel = periodType === 'year'
+                  ? String(new Date(dreData.start_date + 'T12:00:00').getFullYear())
+                  : new Date(dreData.start_date + 'T12:00:00').toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' });
 
                 return (
                 <div className="border-t pt-6">
