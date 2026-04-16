@@ -261,6 +261,7 @@ export default function ValidationPage() {
       });
 
       // Update local state
+      const currentRow = rows.find(r => r.id === rowId);
       setRows(prev =>
         prev.map(r =>
           r.id === rowId
@@ -268,9 +269,45 @@ export default function ValidationPage() {
             : r
         )
       );
-      // Update validated count if this row wasn't already validated
-      const wasValidated = rows.find(r => r.id === rowId)?.is_validated;
+      const wasValidated = currentRow?.is_validated;
       if (!wasValidated) setValidatedCount(prev => prev + 1);
+
+      // Check if other rows have the same description and offer bulk edit
+      if (editForm.category && currentRow?.description) {
+        const sameDescRows = rows.filter(
+          r => r.id !== rowId &&
+          r.description === currentRow.description &&
+          r.category !== editForm.category
+        );
+        if (sameDescRows.length > 0) {
+          const shouldBulkEdit = window.confirm(
+            `Existem mais ${sameDescRows.length} linha(s) com a descrição "${currentRow.description}". Deseja aplicar a mesma categoria "${editForm.category}" a todas?`
+          );
+          if (shouldBulkEdit) {
+            let bulkUpdated = 0;
+            for (const row of sameDescRows) {
+              try {
+                await api.put(`/documents/${docId}/validation-rows/${row.id}`, {
+                  category: editForm.category,
+                  transaction_type: editForm.transaction_type || row.transaction_type,
+                  is_validated: true,
+                });
+                bulkUpdated++;
+              } catch { /* skip failed rows */ }
+            }
+            // Update local state for bulk-edited rows
+            setRows(prev =>
+              prev.map(r =>
+                sameDescRows.some(sr => sr.id === r.id)
+                  ? { ...r, category: editForm.category ?? r.category, transaction_type: editForm.transaction_type ?? r.transaction_type, is_validated: true as const }
+                  : r
+              )
+            );
+            setValidatedCount(prev => prev + sameDescRows.filter(r => !r.is_validated).length);
+            toast.success(`${bulkUpdated} linha(s) atualizadas em lote`);
+          }
+        }
+      }
 
       setEditingRowId(null);
       setEditForm({});
@@ -706,7 +743,7 @@ export default function ValidationPage() {
                                                 transaction_date: e.target.value,
                                               }))
                                             }
-                                            className="h-8 text-sm"
+                                            className="h-9 text-sm w-[140px]"
                                           />
                                         </td>
                                         <td className="px-4 py-2">
@@ -718,7 +755,7 @@ export default function ValidationPage() {
                                                 description: e.target.value,
                                               }))
                                             }
-                                            className="h-8 text-sm"
+                                            className="h-9 text-sm min-w-[200px]"
                                           />
                                         </td>
                                         <td className="px-4 py-2 text-xs text-muted-foreground">
@@ -733,7 +770,7 @@ export default function ValidationPage() {
                                                 category: e.target.value,
                                               }))
                                             }
-                                            className="h-8 text-sm rounded border border-border bg-background px-2 max-w-[180px]"
+                                            className="h-9 text-sm rounded border border-border bg-background px-2 min-w-[200px]"
                                           >
                                             {categories.length > 0 ? (
                                               categories.map((cat) => (
@@ -757,7 +794,7 @@ export default function ValidationPage() {
                                                 transaction_type: e.target.value,
                                               }))
                                             }
-                                            className="h-8 text-sm rounded border border-border bg-background px-2"
+                                            className="h-9 text-sm rounded border border-border bg-background px-2 min-w-[120px]"
                                           >
                                             <option value="receita">Receita</option>
                                             <option value="despesa">Despesa</option>
@@ -777,7 +814,7 @@ export default function ValidationPage() {
                                                 amount: parseFloat(e.target.value) || 0,
                                               }))
                                             }
-                                            className="h-8 text-sm text-right"
+                                            className="h-9 text-sm text-right w-[130px]"
                                           />
                                         </td>
                                         <td className="px-4 py-2 text-center">
