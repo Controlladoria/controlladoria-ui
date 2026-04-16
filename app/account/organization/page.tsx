@@ -686,6 +686,7 @@ export default function OrganizationSettingsPage() {
                         )}
                       </div>
                       <BalanceField label="Reservas e Ajustes" field="reserves_and_adjustments" />
+                      <BalanceField label="Lucros/Prejuízos Acumulados" field="retained_earnings" />
                     </Section>
                   </div>
                 )}

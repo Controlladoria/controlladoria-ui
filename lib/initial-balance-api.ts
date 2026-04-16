@@ -72,6 +72,7 @@ export interface InitialBalanceData {
 
   // Patrimônio Líquido (user input)
   reserves_and_adjustments: number;
+  retained_earnings: number;
 
   // Bank account balances
   bank_account_balances?: BankAccountBalanceEntry[];
@@ -273,6 +274,7 @@ export function createEmptyInitialBalance(): Omit<InitialBalanceData, 'id' | 'or
     provisions_long_term: 0,
     deferred_tax_liabilities: 0,
     reserves_and_adjustments: 0,
+    retained_earnings: 0,
     bank_account_balances: [],
     is_completed: false,
   };

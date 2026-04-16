@@ -816,6 +816,7 @@ export default function InitialBalanceWizard({ onComplete, onSkip }: InitialBala
                   />
                 </div>
                 {renderCurrency("Reservas e Ajustes", "reserves_and_adjustments", "Reservas de capital, reservas de lucros, ajustes de avaliação patrimonial.")}
+                {renderCurrency("Lucros/Prejuízos Acumulados", "retained_earnings", "Lucros ou prejuízos acumulados de exercícios anteriores.")}
               </div>
 
               {/* ============ BALANÇO GERENCIAL SUMMARY ============ */}
