@@ -57,31 +57,6 @@ export default function UploadPage() {
                 </CardContent>
               </Card>
 
-              {/* Template Download */}
-              <Card className="shadow-md border mt-6">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 rounded-xl bg-green-500/10 dark:bg-green-500/20">
-                      <FileSpreadsheet className="w-8 h-8 text-green-600 dark:text-green-400" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-lg font-bold text-foreground">Modelo de Planilha</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Baixe nossa planilha modelo com abas &quot;Recebimentos&quot; e &quot;Pagamentos&quot; para padronizar seus lançamentos financeiros.
-                        Inclui listas de tipos e categorias contábeis.
-                      </p>
-                    </div>
-                    <a
-                      href="/templates/modelo-financeiro.xlsx"
-                      download="modelo-financeiro.xlsx"
-                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-green-600 hover:bg-green-700 text-white font-semibold text-sm transition-colors shadow-sm"
-                    >
-                      <Download className="w-4 h-4" />
-                      Baixar Modelo
-                    </a>
-                  </div>
-                </CardContent>
-              </Card>
             </SubscriptionGuard>
           </div>
         </div>

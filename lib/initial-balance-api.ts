@@ -137,6 +137,7 @@ export interface CompanyInfoUpdate {
   company_phone?: string;
   company_email?: string;
   regime_tributario?: string;
+  capital_social?: number;
 }
 
 // =============================================================================

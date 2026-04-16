@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { apiClient } from "@/lib/api";
 import type { Stats } from "@/lib/types";
 import SubscriptionGuard from "@/components/stripe/SubscriptionGuard";
+import { Download, FileSpreadsheet } from "lucide-react";
 
 export default function DocumentsPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
@@ -38,11 +39,21 @@ export default function DocumentsPage() {
 
         <header className="bg-card/80 backdrop-blur-md border-b-2 border-border shadow-lg">
           <div className="px-4 sm:px-6 lg:px-8 pt-16 lg:pt-6 pb-6 sm:py-8">
-            <div className="text-center lg:text-left">
-              <h1 className="text-3xl sm:text-4xl font-bold text-foreground">📄 Documentos</h1>
-              <p className="text-base sm:text-lg lg:text-xl text-muted-foreground mt-2">
-                Gerencie todos os documentos financeiros
-              </p>
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div className="text-center lg:text-left">
+                <h1 className="text-3xl sm:text-4xl font-bold text-foreground">📄 Documentos</h1>
+                <p className="text-base sm:text-lg lg:text-xl text-muted-foreground mt-2">
+                  Gerencie todos os documentos financeiros
+                </p>
+              </div>
+              <a
+                href="/templates/modelo-financeiro.xlsx"
+                download="modelo-financeiro.xlsx"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-medium text-sm transition-colors shadow-sm"
+              >
+                <FileSpreadsheet className="w-4 h-4" />
+                Baixar Modelo
+              </a>
             </div>
           </div>
         </header>

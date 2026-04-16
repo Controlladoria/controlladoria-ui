@@ -14,6 +14,8 @@
  */
 
 import { useState, useEffect, useCallback } from "react";
+import { DatePicker } from "@/components/ui/date-picker";
+import { format } from "date-fns";
 import {
   Building2,
   ChevronLeft,
@@ -311,6 +313,15 @@ export default function InitialBalanceWizard({ onComplete, onSkip }: InitialBala
         is_completed: true,
       });
 
+      // Save capital social to org settings
+      if (capitalSocial > 0) {
+        try {
+          await orgSettingsApi.updateCompanyInfo({ capital_social: capitalSocial });
+        } catch (e) {
+          console.warn("Failed to save capital social to org:", e);
+        }
+      }
+
       toast.success("Saldos iniciais configurados com sucesso!");
       onComplete();
     } catch (error) {
@@ -467,11 +478,11 @@ export default function InitialBalanceWizard({ onComplete, onSkip }: InitialBala
                 <p className="text-sm text-muted-foreground mb-2">
                   Os saldos informados serão considerados a partir desta data.
                 </p>
-                <input
-                  type="date"
-                  value={data.reference_date}
-                  onChange={(e) => setData((prev) => ({ ...prev, reference_date: e.target.value }))}
-                  className="w-full sm:w-64 px-4 py-2.5 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-[#0d767b]/50 focus:border-[#0d767b]"
+                <DatePicker
+                  value={data.reference_date ? new Date(data.reference_date + 'T12:00:00') : undefined}
+                  onChange={(d) => setData((prev) => ({ ...prev, reference_date: d ? format(d, 'yyyy-MM-dd') : '' }))}
+                  placeholder="Selecione a data de referência"
+                  className="w-full sm:w-64"
                 />
               </div>
 
@@ -788,7 +799,23 @@ export default function InitialBalanceWizard({ onComplete, onSkip }: InitialBala
                 <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mt-4">
                   Patrimônio Líquido
                 </h4>
-                {renderCurrency("Reservas e Ajustes", "reserves_and_adjustments", "Reservas de capital, reservas de lucros, ajustes de avaliação patrimonial. Não inclua o Capital Social (carregado automaticamente do CNPJ).")}
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">
+                    Capital Social
+                  </label>
+                  <p className="text-xs text-muted-foreground mb-1.5">
+                    Capital social registrado na constituição da empresa. Carregado do CNPJ, mas editável.
+                  </p>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={capitalSocial || ""}
+                    onChange={(e) => setCapitalSocial(parseFloat(e.target.value) || 0)}
+                    placeholder="0,00"
+                    className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-[#0d767b]/50"
+                  />
+                </div>
+                {renderCurrency("Reservas e Ajustes", "reserves_and_adjustments", "Reservas de capital, reservas de lucros, ajustes de avaliação patrimonial.")}
               </div>
 
               {/* ============ BALANÇO GERENCIAL SUMMARY ============ */}

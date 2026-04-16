@@ -7,6 +7,8 @@
  */
 
 import { useState, useEffect } from 'react';
+import { DatePicker } from '@/components/ui/date-picker';
+import { format } from 'date-fns';
 import Sidebar from '@/components/layout/Sidebar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -595,7 +597,11 @@ export default function OrganizationSettingsPage() {
                 {balanceEditing && (
                   <div className="mb-4">
                     <label className="block text-sm font-medium text-muted-foreground mb-1.5">Data de Referência</label>
-                    <input type="date" value={balanceForm.reference_date} onChange={(e) => setBalanceForm((p) => ({ ...p, reference_date: e.target.value }))} className="px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[#0d767b]/50" />
+                    <DatePicker
+                      value={balanceForm.reference_date ? new Date(balanceForm.reference_date + 'T12:00:00') : undefined}
+                      onChange={(d) => setBalanceForm((p) => ({ ...p, reference_date: d ? format(d, 'yyyy-MM-dd') : '' }))}
+                      placeholder="Selecione a data de referência"
+                    />
                   </div>
                 )}
 
