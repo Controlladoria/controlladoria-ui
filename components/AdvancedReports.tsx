@@ -728,7 +728,7 @@ export default function AdvancedReports() {
           {/* Period Type Selector */}
           <div>
             <label className="block text-base font-semibold text-foreground mb-3">Tipo de Período</label>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-w-2xl mx-auto">
               {[
                 { value: 'month', label: '🗓️ Mês' },
                 { value: 'year', label: '📊 Ano' },
