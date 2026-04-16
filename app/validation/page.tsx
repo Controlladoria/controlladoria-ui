@@ -27,8 +27,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { ChevronsUpDown } from "lucide-react";
 import SubscriptionGuard from "@/components/stripe/SubscriptionGuard";
 import { InfoModal } from "@/components/ui/info-modal";
+import { cn } from "@/lib/utils";
 
 interface ValidationDocument {
   id: number;
@@ -86,6 +91,14 @@ export default function ValidationPage() {
   const [confirming, setConfirming] = useState(false);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [categoryMap, setCategoryMap] = useState<Record<string, string>>({});
+  const [bulkEditDialog, setBulkEditDialog] = useState<{
+    open: boolean;
+    docId: number;
+    description: string;
+    category: string;
+    transactionType: string;
+    rows: ValidationRow[];
+  }>({ open: false, docId: 0, description: "", category: "", transactionType: "", rows: [] });
   const [addingRow, setAddingRow] = useState(false);
   const [newRowForm, setNewRowForm] = useState<Partial<ValidationRow>>({
     transaction_type: "despesa",
@@ -280,32 +293,14 @@ export default function ValidationPage() {
           r.category !== editForm.category
         );
         if (sameDescRows.length > 0) {
-          const shouldBulkEdit = window.confirm(
-            `Existem mais ${sameDescRows.length} linha(s) com a descrição "${currentRow.description}". Deseja aplicar a mesma categoria "${editForm.category}" a todas?`
-          );
-          if (shouldBulkEdit) {
-            let bulkUpdated = 0;
-            for (const row of sameDescRows) {
-              try {
-                await api.put(`/documents/${docId}/validation-rows/${row.id}`, {
-                  category: editForm.category,
-                  transaction_type: editForm.transaction_type || row.transaction_type,
-                  is_validated: true,
-                });
-                bulkUpdated++;
-              } catch { /* skip failed rows */ }
-            }
-            // Update local state for bulk-edited rows
-            setRows(prev =>
-              prev.map(r =>
-                sameDescRows.some(sr => sr.id === r.id)
-                  ? { ...r, category: editForm.category ?? r.category, transaction_type: editForm.transaction_type ?? r.transaction_type, is_validated: true as const }
-                  : r
-              )
-            );
-            setValidatedCount(prev => prev + sameDescRows.filter(r => !r.is_validated).length);
-            toast.success(`${bulkUpdated} linha(s) atualizadas em lote`);
-          }
+          setBulkEditDialog({
+            open: true,
+            docId,
+            description: currentRow.description,
+            category: editForm.category,
+            transactionType: editForm.transaction_type || currentRow.transaction_type || "despesa",
+            rows: sameDescRows,
+          });
         }
       }
 
@@ -316,6 +311,31 @@ export default function ValidationPage() {
       console.error("Error saving validation row:", error);
       toast.error("Erro ao salvar alteração");
     }
+  };
+
+  const executeBulkEdit = async () => {
+    const { docId, category, transactionType, rows: targetRows } = bulkEditDialog;
+    let updated = 0;
+    for (const row of targetRows) {
+      try {
+        await api.put(`/documents/${docId}/validation-rows/${row.id}`, {
+          category,
+          transaction_type: transactionType,
+          is_validated: true,
+        });
+        updated++;
+      } catch { /* skip */ }
+    }
+    setRows(prev =>
+      prev.map(r =>
+        targetRows.some(tr => tr.id === r.id)
+          ? { ...r, category, transaction_type: transactionType, is_validated: true as const }
+          : r
+      )
+    );
+    setValidatedCount(prev => prev + targetRows.filter(r => !r.is_validated).length);
+    setBulkEditDialog(prev => ({ ...prev, open: false }));
+    toast.success(`${updated} linha(s) atualizadas em lote`);
   };
 
   const validateRow = async (docId: number, rowId: number) => {
@@ -762,28 +782,37 @@ export default function ValidationPage() {
                                           {row.counterparty || "—"}
                                         </td>
                                         <td className="px-4 py-2">
-                                          <select
-                                            value={editForm.category || "nao_categorizado"}
-                                            onChange={(e) =>
-                                              setEditForm((prev) => ({
-                                                ...prev,
-                                                category: e.target.value,
-                                              }))
-                                            }
-                                            className="h-9 text-sm rounded border border-border bg-background px-2 min-w-[200px]"
-                                          >
-                                            {categories.length > 0 ? (
-                                              categories.map((cat) => (
-                                                <option key={cat.key} value={cat.key}>
-                                                  {cat.display_name}
-                                                </option>
-                                              ))
-                                            ) : (
-                                              <option value={editForm.category || ""}>
-                                                {editForm.category || "—"}
-                                              </option>
-                                            )}
-                                          </select>
+                                          <Popover>
+                                            <PopoverTrigger asChild>
+                                              <button className="flex items-center justify-between w-full min-w-[200px] h-9 px-2 text-sm border border-border rounded bg-background hover:bg-accent/50 text-left">
+                                                <span className="truncate">
+                                                  {categoryMap[editForm.category || ""] || editForm.category || "Selecionar..."}
+                                                </span>
+                                                <ChevronsUpDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
+                                              </button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-[280px] p-0" align="start">
+                                              <Command>
+                                                <CommandInput placeholder="Buscar categoria..." className="h-8 text-sm" />
+                                                <CommandList>
+                                                  <CommandEmpty>Nenhuma encontrada.</CommandEmpty>
+                                                  <CommandGroup className="max-h-[200px] overflow-auto">
+                                                    {categories.map((cat) => (
+                                                      <CommandItem
+                                                        key={cat.key}
+                                                        value={`${cat.display_name} ${cat.key}`}
+                                                        onSelect={() => setEditForm((prev) => ({ ...prev, category: cat.key }))}
+                                                        className="text-xs"
+                                                      >
+                                                        <Check className={cn("mr-1.5 h-3 w-3", editForm.category === cat.key ? "opacity-100" : "opacity-0")} />
+                                                        {cat.display_name}
+                                                      </CommandItem>
+                                                    ))}
+                                                  </CommandGroup>
+                                                </CommandList>
+                                              </Command>
+                                            </PopoverContent>
+                                          </Popover>
                                         </td>
                                         <td className="px-4 py-2">
                                           <select
@@ -1197,6 +1226,26 @@ export default function ValidationPage() {
             </div>
           )}
           </SubscriptionGuard>
+
+          {/* Bulk Edit Dialog */}
+          <Dialog open={bulkEditDialog.open} onOpenChange={(open) => setBulkEditDialog(prev => ({ ...prev, open }))}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Aplicar categoria em lote</DialogTitle>
+                <DialogDescription>
+                  Existem mais <strong>{bulkEditDialog.rows.length}</strong> linha(s) com a descrição <strong>"{bulkEditDialog.description}"</strong>. Deseja aplicar a categoria <strong>"{categoryMap[bulkEditDialog.category] || bulkEditDialog.category}"</strong> a todas?
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <DialogClose asChild>
+                  <Button variant="outline">Cancelar</Button>
+                </DialogClose>
+                <Button onClick={executeBulkEdit}>
+                  Aplicar a todas ({bulkEditDialog.rows.length})
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           {/* CNPJ Mismatch Confirmation Modal */}
           {cnpjConfirmDocId !== null && (
