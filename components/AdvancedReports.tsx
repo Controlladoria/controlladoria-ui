@@ -730,8 +730,6 @@ export default function AdvancedReports() {
             <label className="block text-base font-semibold text-foreground mb-3">Tipo de Período</label>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
               {[
-                { value: 'day', label: '📅 Dia' },
-                { value: 'week', label: '📆 Semana' },
                 { value: 'month', label: '🗓️ Mês' },
                 { value: 'year', label: '📊 Ano' },
                 { value: 'custom', label: '🔧 Customizado' },
