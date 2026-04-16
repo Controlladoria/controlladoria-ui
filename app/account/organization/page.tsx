@@ -74,6 +74,7 @@ export default function OrganizationSettingsPage() {
   const [initialBalance, setInitialBalance] = useState<InitialBalanceData | null>(null);
   const [balanceEditing, setBalanceEditing] = useState(false);
   const [balanceForm, setBalanceForm] = useState(createEmptyInitialBalance());
+  const [capitalSocialValue, setCapitalSocialValue] = useState(0);
   const [balanceSaving, setBalanceSaving] = useState(false);
 
   // Logo state
@@ -184,6 +185,15 @@ export default function OrganizationSettingsPage() {
         is_completed: true,
       });
       setInitialBalance(saved);
+
+      // Save capital social to org
+      if (capitalSocialValue !== (companyInfo?.capital_social || 0)) {
+        await orgSettingsApi.updateCompanyInfo({ capital_social: capitalSocialValue });
+        if (companyInfo) {
+          setCompanyInfo({ ...companyInfo, capital_social: capitalSocialValue });
+        }
+      }
+
       setBalanceEditing(false);
       toast.success('Saldos iniciais atualizados!');
     } catch (error: any) {
@@ -587,7 +597,7 @@ export default function OrganizationSettingsPage() {
                       </button>
                     </div>
                   ) : (
-                    <button onClick={() => setBalanceEditing(true)} className="flex items-center gap-1.5 px-5 py-2 text-sm sm:text-base font-medium text-[#0d767b] hover:bg-[#0d767b]/10 rounded-lg transition-colors">
+                    <button onClick={() => { setBalanceEditing(true); setCapitalSocialValue(companyInfo?.capital_social || 0); }} className="flex items-center gap-1.5 px-5 py-2 text-sm sm:text-base font-medium text-[#0d767b] hover:bg-[#0d767b]/10 rounded-lg transition-colors">
                       <Edit3 className="w-4 h-4" />
                       Editar
                     </button>
@@ -653,6 +663,29 @@ export default function OrganizationSettingsPage() {
                     <Section title="Passivo Não Circulante">
                       <BalanceField label="Empréstimos LP" field="long_term_loans" />
                       <BalanceField label="Financiamentos LP" field="long_term_financing" />
+                    </Section>
+
+                    <Section title="Patrimônio Líquido">
+                      <div className="flex items-center justify-between py-3 border-b border-border">
+                        <span className="text-sm sm:text-base text-foreground">Capital Social</span>
+                        {balanceEditing ? (
+                          <div className="relative w-44">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">R$</span>
+                            <input
+                              type="text"
+                              value={capitalSocialValue === 0 ? '' : String(capitalSocialValue)}
+                              onChange={(e) => setCapitalSocialValue(parseCurrencyInput(e.target.value))}
+                              placeholder="0,00"
+                              className="w-full pl-10 pr-3 py-2 bg-background border border-border rounded-lg text-base text-right text-foreground focus:outline-none focus:ring-1 focus:ring-[#0d767b]"
+                            />
+                          </div>
+                        ) : (
+                          <span className="text-sm sm:text-base font-medium text-foreground">
+                            {formatBRL(companyInfo?.capital_social || 0)}
+                          </span>
+                        )}
+                      </div>
+                      <BalanceField label="Reservas e Ajustes" field="reserves_and_adjustments" />
                     </Section>
                   </div>
                 )}
