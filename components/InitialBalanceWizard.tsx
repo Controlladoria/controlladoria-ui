@@ -340,8 +340,7 @@ export default function InitialBalanceWizard({ onComplete, onSkip }: InitialBala
     data.short_term_investments +
     data.accounts_receivable +
     data.inventory +
-    data.prepaid_expenses +
-    bankTotal;
+    data.prepaid_expenses;
 
   const totalAtivoNaoCirculante =
     data.long_term_receivables + data.long_term_investments;
@@ -492,7 +491,10 @@ export default function InitialBalanceWizard({ onComplete, onSkip }: InitialBala
                   <div>
                     <h3 className="text-sm font-semibold text-foreground">Contas Bancárias</h3>
                     <p className="text-xs text-muted-foreground">
-                      Adicione suas contas bancárias e seus saldos atuais
+                      Adicione suas contas bancárias e seus saldos atuais.
+                      <span className="block mt-1 text-amber-600 dark:text-amber-400 font-medium">
+                        Os saldos bancários serão somados ao valor de Caixa e Equivalentes na próxima etapa.
+                      </span>
                     </p>
                   </div>
                   <button
@@ -687,14 +689,41 @@ export default function InitialBalanceWizard({ onComplete, onSkip }: InitialBala
                 Valores que a empresa possui ou espera receber em até 12 meses.
               </p>
 
-              {renderCurrency("Caixa e Equivalentes de Caixa", "cash_and_equivalents", "Dinheiro em caixa físico (excluindo bancos, que já foram informados)")}
+              <div className="space-y-3">
+                <label className="block text-sm font-semibold text-foreground">
+                  Caixa e Equivalentes de Caixa
+                </label>
 
-              {bankTotal > 0 && (
-                <div className="bg-accent/50 rounded-lg p-3 text-sm">
-                  <span className="text-muted-foreground">Saldos bancários informados: </span>
-                  <span className="font-semibold text-foreground">{formatBRL(bankTotal)}</span>
+                {/* Bank total — read-only */}
+                {bankTotal > 0 && (
+                  <div className="flex items-center justify-between py-2.5 px-3 bg-accent/50 rounded-lg border border-border">
+                    <span className="text-sm text-muted-foreground">Saldos Bancários (das contas informadas)</span>
+                    <span className="text-sm font-bold text-foreground tabular-nums">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(bankTotal)}</span>
+                  </div>
+                )}
+
+                {/* Physical cash — editable */}
+                <div>
+                  <label className="block text-xs text-muted-foreground mb-1">Dinheiro Físico em Caixa</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={(data.cash_and_equivalents - bankTotal) > 0 ? (data.cash_and_equivalents - bankTotal) : (data.cash_and_equivalents && !bankTotal ? data.cash_and_equivalents : "")}
+                    onChange={(e) => {
+                      const physicalCash = parseFloat(e.target.value) || 0;
+                      setData((prev) => ({ ...prev, cash_and_equivalents: physicalCash + bankTotal }));
+                    }}
+                    placeholder="0,00"
+                    className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-[#0d767b]/50"
+                  />
                 </div>
-              )}
+
+                {/* Total — auto-calculated */}
+                <div className="flex items-center justify-between py-2.5 px-3 bg-green-500/10 rounded-lg border border-green-200 dark:border-green-800">
+                  <span className="text-sm font-semibold text-foreground">Total Caixa e Equivalentes</span>
+                  <span className="text-sm font-bold text-green-700 dark:text-green-400 tabular-nums">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(data.cash_and_equivalents || 0)}</span>
+                </div>
+              </div>
 
               {renderCurrency("Aplicações Financeiras (Curto Prazo)", "short_term_investments", "CDBs, fundos, títulos com vencimento em até 12 meses")}
               {renderCurrency("Clientes — Contas a Receber", "accounts_receivable", "Valores que clientes devem à empresa")}
@@ -816,7 +845,15 @@ export default function InitialBalanceWizard({ onComplete, onSkip }: InitialBala
                   />
                 </div>
                 {renderCurrency("Reservas e Ajustes", "reserves_and_adjustments", "Reservas de capital, reservas de lucros, ajustes de avaliação patrimonial.")}
-                {renderCurrency("Lucros/Prejuízos Acumulados", "retained_earnings", "Lucros ou prejuízos acumulados de exercícios anteriores.")}
+                <div className="flex items-center justify-between py-3 border-b border-border/50">
+                  <div>
+                    <span className="text-sm font-medium text-muted-foreground italic">Lucros/Prejuízos Acumulados</span>
+                    <p className="text-xs text-muted-foreground">Calculado automaticamente: Ativo - Passivo - Capital Social - Reservas</p>
+                  </div>
+                  <span className={`text-base font-bold tabular-nums ${lucrosAcumulados < 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground'}`}>
+                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(lucrosAcumulados)}
+                  </span>
+                </div>
               </div>
 
               {/* ============ BALANÇO GERENCIAL SUMMARY ============ */}
@@ -1020,7 +1057,14 @@ export default function InitialBalanceWizard({ onComplete, onSkip }: InitialBala
 
             {currentStep < STEPS.length - 1 ? (
               <button
-                onClick={() => setCurrentStep((s) => s + 1)}
+                onClick={() => {
+                  // When moving from step 0 (bank accounts) to step 1 (ativo circulante),
+                  // pre-populate cash_and_equivalents with bank totals if not already set
+                  if (currentStep === 0 && bankTotal > 0 && !data.cash_and_equivalents) {
+                    setData((prev) => ({ ...prev, cash_and_equivalents: bankTotal }));
+                  }
+                  setCurrentStep((s) => s + 1);
+                }}
                 className="flex items-center gap-1.5 px-5 py-2.5 bg-[#0d767b] text-white rounded-lg text-sm font-semibold hover:bg-[#095a5e] transition-colors shadow-md"
               >
                 Próximo

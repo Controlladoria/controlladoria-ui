@@ -1113,6 +1113,14 @@ export default function AdvancedReports() {
                         <tbody>
                           {subtotalRow("Ativo Circulante", bd.ativo?.circulante || 0, pd?.ativo?.circulante)}
                           {lineRow("Caixa e Equivalentes de Caixa", val("1.01.001"), pval("1.01.001"))}
+                          {/* Bank account breakdown (informational sub-lines) */}
+                          {bd.detailed_lines?.filter(l => l.code.startsWith("1.01.006")).map((line, i) => (
+                            <tr key={`bank-${i}`} className="border-b border-border/30">
+                              <td className="px-4 py-1 text-xs text-muted-foreground italic" style={{ paddingLeft: '40px' }}>{line.description}</td>
+                              <td className="px-4 py-1 text-right tabular-nums text-xs text-muted-foreground">{formatBRL(line.amount)}</td>
+                              {hasPrev && <td className="px-4 py-1 text-right tabular-nums text-xs text-muted-foreground border-l border-border/30">{formatBRL(pval(line.code))}</td>}
+                            </tr>
+                          ))}
                           {lineRow("Aplicações Financeiras (curto prazo)", val("1.01.002"), pval("1.01.002"))}
                           {lineRow("Clientes (Contas a Receber)", val("1.01.003"), pval("1.01.003"))}
                           {lineRow("Estoques", val("1.01.004"), pval("1.01.004"))}

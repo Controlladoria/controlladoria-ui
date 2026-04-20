@@ -548,27 +548,38 @@ export default function OrganizationSettingsPage() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {bankAccounts.map((acc) => (
-                      <div key={acc.id} className="flex items-center justify-between p-4 sm:p-5 bg-accent/30 rounded-xl border border-border">
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 bg-gradient-to-br from-[#0d767b] to-[#095a5e] rounded-lg flex items-center justify-center text-white text-sm font-bold">
-                            {acc.bank_code}
+                    {bankAccounts.map((acc) => {
+                      const bankBalance = initialBalance?.bank_account_balances?.find(
+                        (b: any) => b.bank_account_id === acc.id
+                      );
+                      return (
+                        <div key={acc.id} className="flex items-center justify-between p-4 sm:p-5 bg-accent/30 rounded-xl border border-border">
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-gradient-to-br from-[#0d767b] to-[#095a5e] rounded-lg flex items-center justify-center text-white text-sm font-bold">
+                              {acc.bank_code}
+                            </div>
+                            <div>
+                              <p className="text-base font-semibold text-foreground">
+                                {acc.bank_name}
+                                {acc.account_nickname ? ` (${acc.account_nickname})` : ''}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                Ag: {acc.agency} | Conta: {acc.account_number} | {acc.account_type === 'checking' ? 'Corrente' : acc.account_type === 'savings' ? 'Poupança' : 'Investimento'}
+                              </p>
+                              {bankBalance && (
+                                <p className="text-sm font-medium text-green-600 dark:text-green-400 mt-1">
+                                  Saldo inicial: {formatBRL(bankBalance.balance / 100)}
+                                  <span className="text-xs text-muted-foreground ml-2">(editável nos Saldos Iniciais)</span>
+                                </p>
+                              )}
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-base font-semibold text-foreground">
-                              {acc.bank_name}
-                              {acc.account_nickname ? ` (${acc.account_nickname})` : ''}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              Ag: {acc.agency} | Conta: {acc.account_number} | {acc.account_type === 'checking' ? 'Corrente' : acc.account_type === 'savings' ? 'Poupança' : 'Investimento'}
-                            </p>
-                          </div>
+                          <button onClick={() => acc.id && deleteBankAccount(acc.id)} className="text-destructive hover:text-destructive/80 p-2 rounded-lg hover:bg-destructive/10 transition-colors">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
-                        <button onClick={() => acc.id && deleteBankAccount(acc.id)} className="text-destructive hover:text-destructive/80 p-2 rounded-lg hover:bg-destructive/10 transition-colors">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -624,7 +635,50 @@ export default function OrganizationSettingsPage() {
                 ) : (
                   <div className="space-y-4">
                     <Section title="Ativo Circulante">
-                      <BalanceField label="Caixa e Equivalentes" field="cash_and_equivalents" />
+                      {/* Caixa breakdown: bank totals (read-only) + physical cash (editable) = total */}
+                      {(() => {
+                        const src = balanceEditing ? balanceForm : (initialBalance || {} as any);
+                        const ibBankTotal = (initialBalance?.bank_account_balances || []).reduce(
+                          (sum: number, b: any) => sum + (b.balance || 0) / 100, 0
+                        );
+                        const totalCaixa = src.cash_and_equivalents || 0;
+                        const physicalCash = totalCaixa - ibBankTotal;
+
+                        return (
+                          <div className="py-2 space-y-1.5">
+                            <div className="flex items-center justify-between py-1.5 text-sm">
+                              <span className="font-semibold text-foreground">Caixa e Equivalentes</span>
+                              <span className="font-bold text-foreground">{formatBRL(totalCaixa)}</span>
+                            </div>
+                            {ibBankTotal > 0 && (
+                              <div className="flex items-center justify-between py-1 pl-4 text-xs text-muted-foreground">
+                                <span>↳ Saldos Bancários</span>
+                                <span className="tabular-nums">{formatBRL(ibBankTotal)}</span>
+                              </div>
+                            )}
+                            <div className="flex items-center justify-between py-1.5 pl-4 border-b border-border">
+                              <span className="text-sm text-foreground">↳ Dinheiro Físico</span>
+                              {balanceEditing ? (
+                                <div className="relative w-44">
+                                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">R$</span>
+                                  <input
+                                    type="text"
+                                    value={physicalCash === 0 ? '' : String(physicalCash)}
+                                    onChange={(e) => {
+                                      const pc = parseCurrencyInput(e.target.value);
+                                      setBalanceForm((prev) => ({ ...prev, cash_and_equivalents: pc + ibBankTotal }));
+                                    }}
+                                    placeholder="0,00"
+                                    className="w-full pl-10 pr-3 py-2 bg-background border border-border rounded-lg text-base text-right text-foreground focus:outline-none focus:ring-1 focus:ring-[#0d767b]"
+                                  />
+                                </div>
+                              ) : (
+                                <span className="text-sm font-medium text-foreground">{formatBRL(physicalCash > 0 ? physicalCash : 0)}</span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
                       <BalanceField label="Aplicações Financeiras CP" field="short_term_investments" />
                       <BalanceField label="Contas a Receber" field="accounts_receivable" />
                       <BalanceField label="Estoques" field="inventory" />
@@ -686,7 +740,30 @@ export default function OrganizationSettingsPage() {
                         )}
                       </div>
                       <BalanceField label="Reservas e Ajustes" field="reserves_and_adjustments" />
-                      <BalanceField label="Lucros/Prejuízos Acumulados" field="retained_earnings" />
+                      {/* Lucros/Prejuízos — read-only, calculated from Ativo - Passivo - Capital - Reservas */}
+                      {(() => {
+                        const src = balanceEditing ? balanceForm : (initialBalance || {} as any);
+                        const totalAtivo = (src.cash_and_equivalents || 0) + (src.short_term_investments || 0) +
+                          (src.accounts_receivable || 0) + (src.inventory || 0) + (src.prepaid_expenses || 0) +
+                          (src.fixed_assets_land || 0) + (src.fixed_assets_buildings || 0) + (src.fixed_assets_machinery || 0) +
+                          (src.fixed_assets_vehicles || 0) + (src.fixed_assets_furniture || 0) + (src.fixed_assets_computers || 0) +
+                          (src.fixed_assets_other || 0) - (src.accumulated_depreciation || 0) +
+                          (src.intangible_assets || 0) - (src.accumulated_amortization || 0);
+                        const totalPassivo = (src.suppliers_payable || 0) + (src.short_term_loans || 0) +
+                          (src.labor_obligations || 0) + (src.tax_obligations || 0) + (src.other_current_liabilities || 0) +
+                          (src.long_term_loans || 0) + (src.long_term_financing || 0);
+                        const cs = balanceEditing ? capitalSocialValue : (companyInfo?.capital_social || 0);
+                        const reservas = src.reserves_and_adjustments || 0;
+                        const lucros = totalAtivo - totalPassivo - cs - reservas;
+                        return (
+                          <div className="flex items-center justify-between py-3 border-b border-border">
+                            <span className="text-sm sm:text-base text-muted-foreground italic">Lucros/Prejuízos Acumulados</span>
+                            <span className={`text-sm sm:text-base font-medium ${lucros < 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground'}`}>
+                              {formatBRL(lucros)}
+                            </span>
+                          </div>
+                        );
+                      })()}
                     </Section>
                   </div>
                 )}
