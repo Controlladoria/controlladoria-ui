@@ -143,9 +143,19 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   const openCustomerPortal = async () => {
     try {
       const { portal_url } = await stripeApiClient.createPortalSession();
-      // Redirect to Stripe Customer Portal
       window.location.href = portal_url;
-    } catch (error) {
+    } catch (error: any) {
+      const status = error?.response?.status;
+      if (status === 402) {
+        // Trial expired — send to checkout to pick a plan
+        await startCheckout(planTier || 'basic');
+        return;
+      }
+      if (status === 400) {
+        // Still in trial — send to pricing page
+        window.location.href = '/pricing';
+        return;
+      }
       console.error('Failed to open customer portal:', error);
       throw error;
     }
