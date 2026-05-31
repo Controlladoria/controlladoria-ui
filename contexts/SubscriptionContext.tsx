@@ -30,9 +30,10 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // FREE DEMO MODE: set NEXT_PUBLIC_FREE_DEMO_MODE=true to bypass all paywall checks.
-  // To re-enable: set to false or remove the var.
-  const FREE_DEMO_MODE = process.env.NEXT_PUBLIC_FREE_DEMO_MODE === 'true';
+  // FREE DEMO MODE: hardcoded true — subscriptions disabled until further notice.
+  // To re-enable paywalls: change this back to:
+  //   process.env.NEXT_PUBLIC_FREE_DEMO_MODE === 'true'
+  const FREE_DEMO_MODE = true;
 
   // Check if user has active subscription (includes free trial)
   const hasActiveSubscription = FREE_DEMO_MODE || Boolean(
