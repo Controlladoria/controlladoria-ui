@@ -77,6 +77,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Handle impersonation token passed via URL param from sysadmin
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const impersonationToken = params.get('impersonation_token');
+    if (impersonationToken) {
+      // Set as the active access_token cookie so the rest of the app treats it as a normal session
+      authTokens.setTokens(impersonationToken, ''); // no refresh token for impersonation
+      // Remove params from URL without a page reload
+      params.delete('impersonation_token');
+      params.delete('impersonation_session_id');
+      const newUrl = params.toString()
+        ? `${window.location.pathname}?${params.toString()}`
+        : window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, []);
+
   useEffect(() => {
     loadUser();
   }, [loadUser]);
