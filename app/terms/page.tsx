@@ -573,9 +573,9 @@ export default function TermsOfServicePage() {
                 <strong>ControlladorIA</strong>
               </p>
               <p className="text-gray-700 mt-2">
-                E-mail: suporte@controllad oria.com
+                E-mail: suporte@controlladoria.com.br
               </p>
-              <p className="text-gray-700">Legal: legal@controllad oria.com</p>
+              <p className="text-gray-700">Legal: legal@controlladoria.com.br</p>
             </div>
           </section>
         </div>

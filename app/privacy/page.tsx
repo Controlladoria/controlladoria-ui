@@ -59,10 +59,10 @@ export default function PrivacyPolicyPage() {
             </p>
             <div className="bg-gray-50 p-4 rounded-lg mt-4">
               <p className="text-gray-700">
-                <strong>Email:</strong> privacidade@controllad oria.com
+                <strong>Email:</strong> privacidade@controlladoria.com.br
               </p>
               <p className="text-gray-700 mt-2">
-                <strong>Encarregado de Dados (DPO):</strong> dpo@controllad oria.com
+                <strong>Encarregado de Dados (DPO):</strong> dpo@controlladoria.com.br
               </p>
             </div>
           </section>
@@ -386,7 +386,7 @@ export default function PrivacyPolicyPage() {
               <p className="text-gray-800">
                 <strong>📧 Como exercer seus direitos:</strong>
                 <br />
-                Envie um e-mail para <strong>privacidade@controllad oria.com</strong> com
+                Envie um e-mail para <strong>privacidade@controlladoria.com.br</strong> com
                 o assunto "Exercício de Direito LGPD". Responderemos em até 15
                 dias úteis.
               </p>
@@ -460,11 +460,11 @@ export default function PrivacyPolicyPage() {
                 <strong>ControlladorIA</strong>
               </p>
               <p className="text-gray-700 mt-2">
-                E-mail: privacidade@controllad oria.com
+                E-mail: privacidade@controlladoria.com.br
               </p>
-              <p className="text-gray-700">DPO: dpo@controllad oria.com</p>
+              <p className="text-gray-700">DPO: dpo@controlladoria.com.br</p>
               <p className="text-gray-700 mt-4">
-                <strong>Direitos LGPD:</strong> privacidade@controllad oria.com
+                <strong>Direitos LGPD:</strong> privacidade@controlladoria.com.br
               </p>
             </div>
           </section>
