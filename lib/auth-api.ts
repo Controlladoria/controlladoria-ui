@@ -127,6 +127,56 @@ const authApi = axios.create({
 });
 
 // Token management
+//
+// Storage lifetime is deliberately NOT the same as token lifetime. The JWT
+// carries its own `exp` and the server is the authority on whether it is still
+// valid; the cookie is just where we keep it. Previously the access_token
+// cookie was set to expire in 30 minutes — exactly when the JWT expired — so
+// the moment the token went stale it also vanished from the browser. With no
+// token left to present, nothing could trigger the 401-refresh path, and the
+// session watchdog saw "no token" and logged the user out. Keeping the cookie
+// for as long as the refresh token means a stale access token is still
+// *present*, so it can be exchanged for a fresh one.
+const ACCESS_TOKEN_COOKIE_DAYS = 7;
+const REFRESH_TOKEN_COOKIE_DAYS = 7;
+
+/** Refresh this many seconds before the JWT actually expires. */
+const REFRESH_SKEW_SECONDS = 120;
+
+const cookieOptions = (days: number) => ({
+  expires: days,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'strict' as const,
+});
+
+/** Read `exp`/`iat` without verifying — we only use them to time refreshes. */
+function readTokenTimes(token: string | undefined): { exp: number; iat: number | null } | null {
+  if (!token) return null;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    if (typeof payload.exp !== 'number') return null;
+    return { exp: payload.exp, iat: typeof payload.iat === 'number' ? payload.iat : null };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * How long before expiry to renew.
+ *
+ * Clamped to half the token's own lifetime. Without this, a deployment that
+ * shortens ACCESS_TOKEN_EXPIRE_MINUTES below the skew would make every single
+ * request look "about to expire" and trigger its own refresh — a refresh storm
+ * against /auth/refresh. With the clamp, a 30-minute token renews in its last
+ * 2 minutes and a 1-minute token in its last 30 seconds.
+ */
+function effectiveSkew(exp: number, iat: number | null): number {
+  if (iat === null) return REFRESH_SKEW_SECONDS;
+  const lifetime = exp - iat;
+  if (lifetime <= 0) return REFRESH_SKEW_SECONDS;
+  return Math.min(REFRESH_SKEW_SECONDS, Math.floor(lifetime / 2));
+}
+
 export const authTokens = {
   getAccessToken: (): string | undefined => {
     return Cookies.get('access_token');
@@ -136,18 +186,20 @@ export const authTokens = {
     return Cookies.get('refresh_token');
   },
 
+  /** True when the access token is missing, unreadable, or about to expire. */
+  needsRefresh: (): boolean => {
+    const times = readTokenTimes(Cookies.get('access_token'));
+    if (times === null) return true;
+    return Date.now() / 1000 >= times.exp - effectiveSkew(times.exp, times.iat);
+  },
+
   setTokens: (accessToken: string, refreshToken: string) => {
-    // Store tokens in HTTP-only cookies (simulated with secure flag)
-    Cookies.set('access_token', accessToken, {
-      expires: 1/48, // 30 minutes
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict'
-    });
-    Cookies.set('refresh_token', refreshToken, {
-      expires: 7, // 7 days
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict'
-    });
+    Cookies.set('access_token', accessToken, cookieOptions(ACCESS_TOKEN_COOKIE_DAYS));
+    // Impersonation passes an empty refresh token — don't clobber a real one
+    // with an empty cookie.
+    if (refreshToken) {
+      Cookies.set('refresh_token', refreshToken, cookieOptions(REFRESH_TOKEN_COOKIE_DAYS));
+    }
   },
 
   clearTokens: () => {
@@ -155,6 +207,9 @@ export const authTokens = {
     Cookies.remove('refresh_token');
   },
 };
+
+// Shared promise so concurrent callers await one refresh, not many.
+let inFlightRefresh: Promise<string> | null = null;
 
 // Auth API client
 export const authApiClient = {
@@ -221,6 +276,41 @@ export const authApiClient = {
     authTokens.setTokens(response.data.access_token, response.data.refresh_token);
 
     return response.data;
+  },
+
+  /**
+   * Return a usable access token, refreshing first if the current one is
+   * missing or about to expire.
+   *
+   * Single-flight: a burst of parallel requests (a dashboard fires several at
+   * once) shares one refresh instead of each firing its own and racing to
+   * overwrite the cookie — which would invalidate the winners' refresh tokens.
+   *
+   * Returns null when there is nothing to refresh with, i.e. genuinely logged out.
+   */
+  async ensureFreshToken(): Promise<string | null> {
+    if (!authTokens.needsRefresh()) {
+      return authTokens.getAccessToken() ?? null;
+    }
+
+    if (!authTokens.getRefreshToken()) {
+      return null;
+    }
+
+    if (!inFlightRefresh) {
+      inFlightRefresh = authApiClient
+        .refreshToken()
+        .then((tokens) => tokens.access_token)
+        .finally(() => {
+          inFlightRefresh = null;
+        });
+    }
+
+    try {
+      return await inFlightRefresh;
+    } catch {
+      return null;
+    }
   },
 
   // Get current user

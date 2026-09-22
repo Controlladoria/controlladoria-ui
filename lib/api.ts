@@ -35,9 +35,14 @@ if (apiKey) {
 }
 
 // Request interceptor - add JWT token to all requests
+//
+// Refreshes proactively when the token is within the expiry skew, so a long
+// session renews itself instead of waiting to fail a request first. The 401
+// handler below stays as the safety net for tokens the server rejects early
+// (revoked session, password change, clock skew).
 api.interceptors.request.use(
-  (config) => {
-    const token = authTokens.getAccessToken();
+  async (config) => {
+    const token = await authApiClient.ensureFreshToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }

@@ -48,7 +48,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Load user from token on mount
   const loadUser = useCallback(async () => {
-    const token = authTokens.getAccessToken();
+    // Refresh first when needed. On a reload after ~30 minutes the access token
+    // is expired but the 7-day refresh token is still good — treating that as
+    // logged out is what made a page refresh bounce people to /login.
+    const token = await authApiClient.ensureFreshToken();
 
     if (!token) {
       setUser(null);
@@ -99,24 +102,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loadUser();
   }, [loadUser]);
 
-  // Periodic token health check — catch expired tokens before the user clicks something
+  // Periodic token health check — renew the session before it lapses.
+  //
+  // This used to call forceLogout() whenever the access token was absent, which
+  // is what kicked people out mid-session: the access token legitimately goes
+  // away every 30 minutes, and a refresh token being present means the user is
+  // still signed in. "No access token" means "refresh", not "logged out". Only
+  // a refresh that actually fails ends the session.
   useEffect(() => {
     if (!isAuthenticated) return;
 
     tokenCheckRef.current = setInterval(async () => {
-      const token = authTokens.getAccessToken();
+      const token = await authApiClient.ensureFreshToken();
       if (!token) {
         forceLogout();
-        return;
-      }
-
-      // Quick ping to verify token is still valid
-      try {
-        await authApiClient.getCurrentUser();
-      } catch {
-        // Token expired or invalid — the interceptor will try to refresh.
-        // If refresh also fails, the interceptor redirects to /login.
-        // We don't need to do anything here — the interceptor handles it.
       }
     }, 5 * 60 * 1000); // Check every 5 minutes
 
