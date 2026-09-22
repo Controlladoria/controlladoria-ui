@@ -9,6 +9,7 @@ import { FontSizeProvider } from "@/contexts/FontSizeContext";
 import TrialWarningBanner from "@/components/TrialWarningBanner";
 import EmailVerificationBanner from "@/components/EmailVerificationBanner";
 import ImpersonationBanner from "@/components/ImpersonationBanner";
+import AdvisorLauncher from "@/components/advisor/AdvisorLauncher";
 import "./globals.css";
 
 const poppins = Poppins({
@@ -52,6 +53,7 @@ export default function RootLayout({
                   <TrialWarningBanner />
                   <EmailVerificationBanner />
                   {children}
+                  <AdvisorLauncher />
                 </SubscriptionProvider>
               </FontSizeProvider>
             </ThemeProvider>

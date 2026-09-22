@@ -243,4 +243,70 @@ html {
   .safe-padding-bottom {
     padding-bottom: env(safe-area-inset-bottom);
   }
+
+  /*
+   * Markdown returned by the AI advisor.
+   * Scoped tightly: the answers are rendered inside a small chat bubble, so
+   * these are deliberately more compact than typical prose styles.
+   */
+  .advisor-prose > :first-child {
+    margin-top: 0;
+  }
+
+  .advisor-prose > :last-child {
+    margin-bottom: 0;
+  }
+
+  .advisor-prose p {
+    @apply my-2 leading-relaxed;
+  }
+
+  .advisor-prose strong {
+    @apply font-semibold text-foreground;
+  }
+
+  .advisor-prose ul {
+    @apply my-2 list-disc space-y-1 pl-5;
+  }
+
+  .advisor-prose ol {
+    @apply my-2 list-decimal space-y-1 pl-5;
+  }
+
+  .advisor-prose h1,
+  .advisor-prose h2,
+  .advisor-prose h3,
+  .advisor-prose h4 {
+    @apply mt-3 mb-1.5 text-sm font-semibold text-foreground;
+  }
+
+  .advisor-prose code {
+    @apply rounded bg-background/70 px-1 py-0.5 text-[0.85em];
+  }
+
+  .advisor-prose pre {
+    @apply my-2 overflow-x-auto rounded-lg bg-background/70 p-2 text-xs;
+  }
+
+  /* Tables can exceed the bubble width — scroll them instead of the page */
+  .advisor-prose table {
+    @apply my-2 block w-full overflow-x-auto border-collapse text-xs;
+  }
+
+  .advisor-prose th,
+  .advisor-prose td {
+    @apply border border-border px-2 py-1 text-left;
+  }
+
+  .advisor-prose th {
+    @apply bg-background/50 font-semibold;
+  }
+
+  .advisor-prose a {
+    @apply underline underline-offset-2;
+  }
+
+  .advisor-prose blockquote {
+    @apply my-2 border-l-2 border-border pl-3 text-muted-foreground;
+  }
 }
