@@ -7,7 +7,7 @@ import { useFontSize } from '@/contexts/FontSizeContext';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import Sidebar from '@/components/layout/Sidebar';
 import { toast } from 'sonner';
-import { User, Building2, Hash, Save, X, Sun, Moon, Monitor, Type, ArrowUpDown, GripVertical, ChevronUp, ChevronDown, MapPin, Phone, Mail, Calendar, Briefcase, Users, Shield, CheckCircle, XCircle, ChevronRight } from 'lucide-react';
+import { User, Building2, Hash, Save, X, Sun, Moon, Monitor, Type, ArrowUpDown, GripVertical, ChevronUp, ChevronDown, MapPin, Phone, Mail, Calendar, Briefcase, Users, Shield, CheckCircle, XCircle, ChevronRight, CalendarClock } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -571,6 +571,28 @@ function ProfilePageContent() {
                     ))}
                   </div>
                 </div>
+              </div>
+            </div>
+
+            {/* Payment Reminders Card */}
+            <div className="bg-card rounded-xl shadow-xl p-6 sm:p-8 lg:p-10 border-2 border-border">
+              <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-2 flex items-center gap-3">
+                    <CalendarClock className="w-7 h-7 text-[#0d767b]" />
+                    Lembretes de pagamento
+                  </h2>
+                  <p className="text-muted-foreground text-base sm:text-lg">
+                    Aviso ao entrar e e-mail com os pagamentos do dia, da semana ou do mês
+                  </p>
+                </div>
+                <Link
+                  href="/account/notifications"
+                  className="bg-gradient-to-r from-[#0d767b] to-[#095a5e] hover:from-[#095a5e] hover:to-[#084a4e] text-white text-base sm:text-lg font-bold py-3 sm:py-4 px-6 sm:px-8 rounded-xl w-full sm:w-auto whitespace-nowrap flex items-center justify-center gap-2"
+                >
+                  Configurar Lembretes
+                  <ChevronRight className="w-5 h-5" />
+                </Link>
               </div>
             </div>
 

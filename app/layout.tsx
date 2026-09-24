@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { Poppins, Inter } from "next/font/google";
 import { Toaster } from "sonner";
 import { AuthProvider } from "@/contexts/AuthContext";
@@ -10,6 +11,7 @@ import TrialWarningBanner from "@/components/TrialWarningBanner";
 import EmailVerificationBanner from "@/components/EmailVerificationBanner";
 import ImpersonationBanner from "@/components/ImpersonationBanner";
 import AdvisorLauncher from "@/components/advisor/AdvisorLauncher";
+import UpcomingPaymentsAlert from "@/components/payment-reminders/UpcomingPaymentsAlert";
 import "./globals.css";
 
 const poppins = Poppins({
@@ -52,6 +54,10 @@ export default function RootLayout({
                   <ImpersonationBanner />
                   <TrialWarningBanner />
                   <EmailVerificationBanner />
+                  {/* Suspense: the alert reads the ?pagamentos= deep link via useSearchParams */}
+                  <Suspense fallback={null}>
+                    <UpcomingPaymentsAlert />
+                  </Suspense>
                   {children}
                   <AdvisorLauncher />
                 </SubscriptionProvider>
